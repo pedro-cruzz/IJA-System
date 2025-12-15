@@ -55,7 +55,7 @@
                     {% for p in solicitacoes %}
                     <tr>
                         <td>
-                            <strong class="text-dark">
+                            <strong class="text-main">
                                 {{ p.data_agendamento.strftime('%d/%m/%y') }}
                             </strong>
                             <br />
@@ -73,7 +73,7 @@
                                 </small>
 
                                 <div class="mt-1">
-                                    <span class="badge bg-light text-main border">{{ p.foco }}</span>
+                                    <span class="badge bg-secondary">{{ p.foco }}</span>
                                     {% if p.latitude %}
                                         <i class="bi bi-geo-alt-fill text-danger ms-1" title="Localização GPS salva"></i>
                                     {% endif %}
@@ -143,7 +143,7 @@
 {% for p in solicitacoes %}
 <div class="modal fade" id="modalDetalhes{{ p.id }}" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
+        <div class="modal-content"> <!-- Adiciona o fundo escuro e texto claro -->
             <div class="modal-header">
                 <h5 class="modal-title">Detalhes do Pedido #{{ p.id }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -157,7 +157,7 @@
                 <p class="mb-2 small"><strong>Bairro:</strong> {{ p.bairro }} - {{ p.cidade }}/{{ p.uf }}</p>
                 
                 {% if p.latitude and p.longitude %}
-                <div class="d-flex justify-content-between align-items-center bg-light p-2 rounded border mb-3">
+                <div class="d-flex justify-content-between align-items-center p-2 rounded border mb-3"> <!-- Fundo escuro para essa seção -->
                     <div>
                         <small class="text-muted d-block">Coordenadas:</small>
                         <strong class="font-monospace small">{{ p.latitude }}, {{ p.longitude }}</strong>
@@ -192,7 +192,7 @@
                 </div>
 
                 {% if p.observacao %}
-                <div class="p-2 bg-light rounded border mb-3">
+                <div class="p-2 rounded border mb-3">
                     <small class="text-muted d-block fw-bold">Observação do Usuário:</small>
                     <em class="small">"{{ p.observacao }}"</em>
                 </div>
@@ -218,5 +218,6 @@
     </div>
 </div>
 {% endfor %}
+
 
 {% endblock %}
