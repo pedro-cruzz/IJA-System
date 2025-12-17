@@ -205,7 +205,7 @@ def exportar_excel():
         "Endereço Completo",       # <-- CAMPO ÚNICO
         "Latitude", "Longitude",
         "Foco", "Tipo Visita", "Altura",
-        "Criadouro?", "Apoio CET?",
+        "Apoio CET?",
         "Observação",
         "Status", "Protocolo", "Justificativa"
     ]
@@ -244,7 +244,6 @@ def exportar_excel():
             endereco_completo += f" - {p.complemento}"
 
         # Booleans
-        criadouro_txt = "SIM" if getattr(p, 'criadouro', None) else "NÃO"
         cet_txt = "SIM" if getattr(p, 'apoio_cet', None) else "NÃO"
 
         # Data formatada
@@ -275,7 +274,6 @@ def exportar_excel():
             p.foco,
             getattr(p, 'tipo_visita', ''),
             getattr(p, 'altura_voo', ''),
-            criadouro_txt,
             cet_txt,
             getattr(p, 'observacao', ''),
             p.status,
@@ -417,7 +415,6 @@ def novo():
             else:
                 hora_obj = None
 
-            criadouro_bool = request.form.get('criadouro') == 'sim'
             apoio_cet_bool = request.form.get('apoio_cet') == 'sim'
 
 
@@ -437,7 +434,6 @@ def novo():
 
                 tipo_visita=request.form.get('tipo_visita'),
                 altura_voo=request.form.get('altura_voo'),
-                criadouro=criadouro_bool,
                 apoio_cet=apoio_cet_bool,
                 observacao=request.form.get('observacao'),
 
@@ -580,6 +576,9 @@ def relatorios():
     total_aprovadas = aplicar_filtros_base(base_query, filtro_data, uvis_id) \
         .filter(Solicitacao.status == "APROVADO").count()
 
+    total_aprovadas_com_recomendacoes = aplicar_filtros_base(base_query, filtro_data, uvis_id) \
+        .filter(Solicitacao.status == "APROVADO COM RECOMENDAÇÕES").count()
+
     total_recusadas = aplicar_filtros_base(base_query, filtro_data, uvis_id) \
         .filter(Solicitacao.status == "NEGADO").count()
 
@@ -647,6 +646,7 @@ def relatorios():
         'relatorios.html',
         total_solicitacoes=total_solicitacoes,
         total_aprovadas=total_aprovadas,
+        total_aprovadas_com_recomendacoes=total_aprovadas_com_recomendacoes,
         total_recusadas=total_recusadas,
         total_analise=total_analise,
         total_pendentes=total_pendentes,
@@ -710,6 +710,7 @@ def exportar_relatorio_pdf():
     # 3. Totais
     total_solicitacoes = len(query_results)
     total_aprovadas = sum(1 for s, u in query_results if s.status == "APROVADO")
+    total_aprovadas_com_recomendacoes = sum(1 for s, u in query_results if s.status == "APROVADO COM RECOMENDAÇÕES")
     total_recusadas = sum(1 for s, u in query_results if s.status == "NEGADO")
     total_analise = sum(1 for s, u in query_results if s.status == "EM ANÁLISE")
     total_pendentes = sum(1 for s, u in query_results if s.status == "PENDENTE")
@@ -893,6 +894,7 @@ def exportar_relatorio_pdf():
         ['Métrica', 'Quantidade'],
         ['Total de Solicitações', str(total_solicitacoes)],
         ['Aprovadas', str(total_aprovadas)],
+        ['Aprovadas com Recomendações', str(total_aprovadas_com_recomendacoes)],
         ['Recusadas', str(total_recusadas)],
         ['Em Análise', str(total_analise)],
         ['Pendentes', str(total_pendentes)]
@@ -1316,7 +1318,6 @@ def admin_editar_completo(id):
             pedido.foco = request.form.get('foco')
             pedido.tipo_visita = request.form.get('tipo_visita')
             pedido.altura_voo = request.form.get('altura_voo')
-            pedido.criadouro = request.form.get('criadouro') == 'sim'
             pedido.apoio_cet = request.form.get('apoio_cet') == 'sim'
             pedido.observacao = request.form.get('observacao')
 
@@ -1345,7 +1346,7 @@ def admin_editar_completo(id):
 
                 criar_notificacao(
                     usuario_id=pedido.usuario_id,
-                    titulo="📅 Agendamento atualizado",
+                    titulo="Agendamento atualizado",
                     mensagem=f"Sua solicitação foi agendada para {data_fmt} às {hora_fmt}.",
                     link=url_for("main.agenda")
                 )
@@ -1431,6 +1432,7 @@ def agenda():
             "start": f"{data}T{hora}",
             "color": (
                 "#198754" if e.status == "APROVADO" else
+                "#ffa023" if e.status == "APROVADO COM RECOMENDAÇÕES" else
                 "#dc3545" if e.status == "NEGADO" else
                 "#ffc107" if e.status == "EM ANÁLISE" else
                 "#0d6efd"
@@ -1517,7 +1519,7 @@ def garantir_notificacoes_do_dia(usuario_id):
 
         criar_notificacao(
             usuario_id=usuario_id,
-            titulo="📅 Agendamento para hoje",
+            titulo="Agendamento para hoje",
             mensagem=f"Você tem um agendamento hoje às {hora_fmt} (Foco: {s.foco}).",
             link=link
         )
@@ -1635,6 +1637,7 @@ UVIS_FAQ = [
             "- **Pendente**: solicitação registrada e aguardando início do processo.\n"
             "- **Em Análise**: pedido em validação pela equipe responsável.\n"
             "- **Aprovado**: pedido autorizado (pode aparecer o número de protocolo).\n"
+            "- **Aprovado com Recomendações**: pedido aprovado com sugestões de melhoria.\n"
             "- **Negado**: pedido não aprovado (o motivo aparece nos detalhes).\n\n"
             "💡 Dica: clique em **Detalhes** para ver justificativa/protocolo."
         ),
@@ -1645,7 +1648,7 @@ UVIS_FAQ = [
         "answer": (
             "Na tela **Minhas Solicitações** você encontra:\n"
             "- Botão **Nova Solicitação** (abre o formulário)\n"
-            "- **Filtro por status** (Pendente, Em Análise, Aprovado, Negado)\n"
+            "- **Filtro por status** (Pendente, Em Análise, Aprovado, Aprovado com Recomendações, Negado)\n"
             "- **Tabela** com data/hora, localização e foco\n"
             "- Botão **Detalhes** (abre um modal com informações completas)\n"
         ),
@@ -1741,7 +1744,7 @@ def uvis_chatbot():
 
     if not best or best_score == 0:
         sugestoes = [
-            "• “O que significa Pendente/Em Análise/Aprovado/Negado?”",
+            "• “O que significa Pendente/Em Análise/Aprovado/Aprovado com Recomendações/Negado?”",
             "• “Quais campos são obrigatórios na Nova Solicitação?”",
             "• “O que fazer se o CEP não encontrar?”",
             "• “Qual o checklist antes de enviar?”",

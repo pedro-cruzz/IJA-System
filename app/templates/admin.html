@@ -135,16 +135,10 @@
                         </div>
 
                         <div class="mb-3">
-                            {% if p.criadouro %}
-                            <span class="badge bg-danger">Criadouro: SIM</span>
-                            {% else %}
-                            <span class="badge bg-light text-secondary border">Criadouro: NÃO</span>
-                            {% endif %}
-
                             {% if p.apoio_cet %}
                             <span class="badge bg-warning text-dark">Apoio CET: SIM</span>
                             {% else %}
-                            <span class="badge bg-light text-secondary border">Apoio CET: NÃO</span>
+                            <span class="badge bg-danger text-dark">Apoio CET: NÃO</span>
                             {% endif %}
                         </div>
 
@@ -187,6 +181,7 @@
                                     <option value="PENDENTE" {% if p.status=='PENDENTE' %}selected{% endif %}>⚪️ Pendente</option>
                                     <option value="EM ANÁLISE" {% if p.status=='EM ANÁLISE' %}selected{% endif %}>🟡 Em Análise</option>
                                     <option value="APROVADO" {% if p.status=='APROVADO' %}selected{% endif %}>🟢 APROVAR</option>
+                                    <option value="APROVADO COM RECOMENDAÇÕES" {% if p.status=='APROVADO COM RECOMENDAÇÕES' %}selected{% endif %}>🟠 APROVADO COM RECOMENDAÇÕES</option>
                                     <option value="NEGADO" {% if p.status=='NEGADO' %}selected{% endif %}>🔴 NEGAR</option>
                                 </select>
 
