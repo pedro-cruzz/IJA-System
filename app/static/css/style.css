@@ -460,3 +460,70 @@ body.dark-mode .list-group-item-light-custom { background-color: #3f98b3a1 !impo
   .fc .fc-toolbar-title { font-size: 1.05rem; }
   .fc .fc-button { padding: 7px 10px !important; }
 }
+
+/* -----------------------------------------
+   15) PAGINAÇÃO - OCEANO AZUL
+   ----------------------------------------- */
+.pagination {
+    gap: 5px; /* Espaçamento entre os botões */
+}
+
+.page-item .page-link {
+    border-radius: var(--radius-sm) !important;
+    padding: 0.6rem 1rem;
+    color: var(--color-primary);
+    background-color: var(--color-bg-white);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+/* Estado: Hover (Ao passar o mouse) */
+.page-item .page-link:hover {
+    background-color: rgba(0, 163, 196, 0.1);
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+    transform: translateY(-2px);
+}
+
+/* Estado: Ativo (Página atual) */
+.page-item.active .page-link {
+    background-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+    color: #ffffff !important;
+    box-shadow: var(--shadow-md);
+}
+
+/* Estado: Desabilitado */
+.page-item.disabled .page-link {
+    background-color: transparent;
+    color: var(--color-text-muted);
+    border-color: rgba(0, 0, 0, 0.05);
+    opacity: 0.6;
+}
+
+/* -----------------------------------------
+   PAGINAÇÃO - MODO DARK
+   ----------------------------------------- */
+body.dark-mode .page-item .page-link {
+    background-color: #1c2b3f; /* Fundo dos inputs no dark */
+    color: var(--color-text-main);
+    border-color: #233549;
+}
+
+body.dark-mode .page-item .page-link:hover {
+    background-color: rgba(0, 224, 255, 0.15);
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+}
+
+body.dark-mode .page-item.active .page-link {
+    background-color: var(--color-accent) !important;
+    border-color: var(--color-accent) !important;
+    color: #101927 !important; /* Texto escuro no botão brilhante */
+}
+
+body.dark-mode .page-item.disabled .page-link {
+    background-color: transparent;
+    border-color: #233549;
+}

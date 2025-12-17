@@ -1,34 +1,37 @@
-{% extends "base.html" %} {% block content %}
+{% extends "base.html" %} 
+{% block content %}
 
 <div class="container-fluid">
-  <!-- TOPO -->
   <div class="d-flex align-items-center justify-content-between mb-3">
     <h2 class="text-secondary"><i class="bi bi-bell-fill me-2 "></i>Notificações</h2>
 
-    <!-- LIMPAR TODAS -->
+    {% if itens %}
     <form
       method="POST"
       action="{{ url_for('main.limpar_notificacoes') }}"
-      onsubmit="return confirm('Deseja realmente apagar todas as notificações?');"
+      class="form-deletar"
+      data-confirm-text="Você está prestes a apagar TODAS as notificações permanentemente."
     >
-      <button class="btn btn-outline-danger btn-sm">
+      <button type="submit" class="btn btn-outline-danger btn-sm">
         <i class="bi bi-trash3"></i> Limpar todas
       </button>
     </form>
+    {% endif %}
   </div>
 
-  <!-- CARD -->
   <div class="card shadow-sm rounded-4">
     <div class="card-body p-0">
       {% if not itens %}
-      <div class="text-muted p-4">Nenhuma notificação por enquanto.</div>
+      <div class="text-muted p-4 text-center">
+        <i class="bi bi-chat-left-dots fs-1 d-block mb-2 opacity-50"></i>
+        Nenhuma notificação por enquanto.
+      </div>
       {% else %}
       <div class="list-group list-group-flush">
         {% for n in itens %}
         <div
           class="list-group-item d-flex justify-content-between align-items-start {% if not n.lida_em %}list-group-item-light-custom{% endif %}"
         >
-          <!-- CONTEÚDO CLICÁVEL -->
           <a
             href="{{ url_for('main.ler_notificacao', notif_id=n.id) }}"
             class="flex-grow-1 text-decoration-none"
@@ -52,19 +55,19 @@
               <div class="text-muted small">{{ n.mensagem }}</div>
 
               <div class="text-muted small mt-1">
-                {{ n.criada_em.strftime("%d/%m/%Y %H:%M") if n.criada_em else ""
-                }}
+                <i class="bi bi-clock me-1"></i>
+                {{ n.criada_em.strftime("%d/%m/%Y %H:%M") if n.criada_em else "" }}
               </div>
             </div>
           </a>
 
-          <!-- EXCLUIR UMA -->
           <form
             method="POST"
             action="{{ url_for('main.excluir_notificacao', notif_id=n.id) }}"
-            onsubmit="return confirm('Deseja apagar esta notificação?');"
+            class="form-deletar"
           >
             <button
+              type="submit"
               class="btn btn-sm btn-outline-danger ms-2"
               title="Excluir notificação"
             >
