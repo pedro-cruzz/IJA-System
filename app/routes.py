@@ -111,7 +111,7 @@ def dashboard():
 
     paginacao = query.order_by(
         Solicitacao.data_criacao.desc()
-    ).paginate(page=page, per_page=3, error_out=False)
+    ).paginate(page=page, per_page=6, error_out=False)
 
     return render_template(
         'dashboard.html',
