@@ -1563,12 +1563,11 @@ def agenda_exportar_excel():
         query = query.filter(Solicitacao.status == filtro_status)
 
     if mes and ano:
-    filtro_mesano = f"{ano}-{mes:02d}"
-    if db.engine.name == 'postgresql':
-        query = query.filter(db.func.to_char(Solicitacao.data_agendamento, "YYYY-MM") == filtro_mesano)
-    else:
-        query = query.filter(db.func.strftime("%Y-%m", Solicitacao.data_agendamento) == filtro_mesano)
-
+        filtro_mesano = f"{ano}-{mes:02d}"
+        if db.engine.name == 'postgresql':
+            query = query.filter(db.func.to_char(Solicitacao.data_agendamento, "YYYY-MM") == filtro_mesano)
+        else:
+            query = query.filter(db.func.strftime("%Y-%m", Solicitacao.data_agendamento) == filtro_mesano)
     query = query.order_by(
         Solicitacao.data_agendamento.desc(),
         Solicitacao.hora_agendamento.desc()
