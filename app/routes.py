@@ -175,151 +175,124 @@ def exportar_excel():
         flash('Permissão negada para exportar.', 'danger')
         return redirect(url_for('main.admin_dashboard'))
 
-    # --- Captura filtros ---
-    filtro_status = request.args.get("status")
-    filtro_unidade = request.args.get("unidade")
-    filtro_regiao = request.args.get("regiao")
+    try:
+        # --- Captura filtros ---
+        filtro_status = request.args.get("status")
+        filtro_unidade = request.args.get("unidade")
+        filtro_regiao = request.args.get("regiao")
 
-    # Query base
-    query = Solicitacao.query.join(Usuario)
+        # Query base com JOIN explícito
+        query = db.session.query(Solicitacao).join(Usuario, Usuario.id == Solicitacao.usuario_id)
 
-    if filtro_status:
-        query = query.filter(Solicitacao.status == filtro_status)
+        # Filtros de String (ilike funciona bem no Postgres para busca insensível a maiúsculas)
+        if filtro_status:
+            query = query.filter(Solicitacao.status == filtro_status)
 
-    if filtro_unidade:
-        query = query.filter(Usuario.nome_uvis.ilike(f"%{filtro_unidade}%"))
+        if filtro_unidade:
+            query = query.filter(Usuario.nome_uvis.ilike(f"%{filtro_unidade}%"))
 
-    if filtro_regiao:
-        query = query.filter(Usuario.regiao.ilike(f"%{filtro_regiao}%"))
+        if filtro_regiao:
+            query = query.filter(Usuario.regiao.ilike(f"%{filtro_regiao}%"))
 
-    pedidos = query.order_by(Solicitacao.data_criacao.desc()).all()
+        # Executa a busca
+        pedidos = query.order_by(Solicitacao.data_criacao.desc()).all()
 
-    # --- CRIA EXCEL ---
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Relatório de Solicitações"
+        # --- CRIA EXCEL ---
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Relatório de Solicitações"
 
-    # Cabeçalho atualizado com ENDEREÇO ÚNICO
-    headers = [
-        "ID", "Unidade", "Região",
-        "Data Agendada", "Hora",
-        "Endereço Completo",       # <-- CAMPO ÚNICO
-        "Latitude", "Longitude",
-        "Foco", "Tipo Visita", "Altura",
-        "Apoio CET?",
-        "Observação",
-        "Status", "Protocolo", "Justificativa"
-    ]
-
-    # Estilos
-    header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
-    header_font = Font(color="FFFFFF", bold=True)
-    thin_border = Border(
-        left=Side(style='thin'),
-        right=Side(style='thin'),
-        top=Side(style='thin'),
-        bottom=Side(style='thin')
-    )
-
-    # Cabeçalho
-    for col_num, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col_num, value=header)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        cell.border = thin_border
-
-    # Conteúdo
-    row_num = 2
-    for p in pedidos:
-
-        # --- ENDEREÇO COMPLETO ---
-        endereco_completo = (
-            f"{p.logradouro or ''}, {getattr(p, 'numero', '')} - "
-            f"{p.bairro or ''} - "
-            f"{(p.cidade or '')}/{(p.uf or '')} - "
-            f"{p.cep or ''}"
-        )
-
-        if getattr(p, 'complemento', None):
-            endereco_completo += f" - {p.complemento}"
-
-        # Booleans
-        cet_txt = "SIM" if getattr(p, 'apoio_cet', None) else "NÃO"
-
-        # Data formatada
-        if p.data_agendamento:
-            try:
-                if isinstance(p.data_agendamento, (date, datetime)):
-                    data_formatada = p.data_agendamento.strftime("%d-%m-%y")
-                else:
-                    data_formatada = datetime.strptime(str(p.data_agendamento), "%Y-%m-%d").strftime("%d-%m-%y")
-            except ValueError:
-                data_formatada = str(p.data_agendamento)
-        else:
-            data_formatada = ""
-
-        # Linha completa
-        row = [
-            p.id,
-            p.autor.nome_uvis,
-            p.autor.regiao,
-            data_formatada,
-            p.hora_agendamento,
-
-            endereco_completo,     # <-- CAMPO ÚNICO AQUI
-
-            getattr(p, 'latitude', ''),
-            getattr(p, 'longitude', ''),
-
-            p.foco,
-            getattr(p, 'tipo_visita', ''),
-            getattr(p, 'altura_voo', ''),
-            cet_txt,
-            getattr(p, 'observacao', ''),
-            p.status,
-            p.protocolo,
-            p.justificativa
+        headers = [
+            "ID", "Unidade", "Região",
+            "Data Agendada", "Hora",
+            "Endereço Completo", 
+            "Latitude", "Longitude",
+            "Foco", "Tipo Visita", "Altura",
+            "Apoio CET?",
+            "Observação",
+            "Status", "Protocolo", "Justificativa"
         ]
 
-        # Escreve na planilha
-        for col_num, value in enumerate(row, 1):
-            cell = ws.cell(row=row_num, column=col_num, value=value)
+        # Estilos (Cores e Bordas)
+        header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+        header_font = Font(color="FFFFFF", bold=True)
+        thin_border = Border(
+            left=Side(style='thin'), right=Side(style='thin'),
+            top=Side(style='thin'), bottom=Side(style='thin')
+        )
+
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_num, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
             cell.border = thin_border
-            cell.alignment = Alignment(vertical="center", wrap_text=True)
 
-        row_num += 1
+        # Conteúdo
+        for row_num, p in enumerate(pedidos, 2):
+            endereco_completo = (
+                f"{p.logradouro or ''}, {p.numero or ''} - "
+                f"{p.bairro or ''} - "
+                f"{(p.cidade or '')}/{(p.uf or '')} - {p.cep or ''}"
+            )
+            if getattr(p, 'complemento', None):
+                endereco_completo += f" - {p.complemento}"
 
-    # Congela o cabeçalho
-    ws.freeze_panes = "A2"
+            cet_txt = "SIM" if p.apoio_cet else "NÃO"
 
-    # Ajuste automático de largura
-    for col in ws.columns:
-        max_length = 0
-        column_letter = col[0].column_letter
+            # Formatação de Data no Python (Independente do Banco)
+            data_formatada = ""
+            if p.data_agendamento:
+                if isinstance(p.data_agendamento, (date, datetime)):
+                    data_formatada = p.data_agendamento.strftime("%d/%m/%y")
+                else:
+                    try:
+                        data_formatada = datetime.strptime(str(p.data_agendamento), "%Y-%m-%d").strftime("%d/%m/%y")
+                    except:
+                        data_formatada = str(p.data_agendamento)
 
-        for cell in col:
-            try:
+            row = [
+                p.id, p.autor.nome_uvis, p.autor.regiao,
+                data_formatada, str(p.hora_agendamento or ""),
+                endereco_completo,
+                p.latitude or "", p.longitude or "",
+                p.foco, p.tipo_visita or "", p.altura_voo or "",
+                cet_txt, p.observacao or "",
+                p.status, p.protocolo or "", p.justificativa or ""
+            ]
+
+            for col_num, value in enumerate(row, 1):
+                cell = ws.cell(row=row_num, column=col_num, value=value)
+                cell.border = thin_border
+                cell.alignment = Alignment(vertical="center", wrap_text=True)
+
+        ws.freeze_panes = "A2"
+
+        # Largura automática com limite de segurança
+        for col in ws.columns:
+            max_length = 0
+            column_letter = col[0].column_letter
+            for cell in col:
                 if cell.value:
                     max_length = max(max_length, len(str(cell.value)))
-            except:
-                pass
+            ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
 
-        ws.column_dimensions[column_letter].width = max_length + 2
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
 
-    # Salvar em memória
-    output = BytesIO()
-    wb.save(output)
-    output.seek(0)
+        return send_file(
+            output,
+            download_name="relatorio_solicitacoes.xlsx",
+            as_attachment=True,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
-    # Enviar arquivo
-    return send_file(
-        output,
-        download_name="relatorio_solicitacoes.xlsx",
-        as_attachment=True,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
+    except Exception as e:
+        db.session.rollback() # Essencial para não travar o banco no Render
+        print(f"ERRO EXPORTAR EXCEL: {str(e)}")
+        flash("Erro ao gerar o Excel. Verifique se os dados estão corretos.", "danger")
+        return redirect(url_for('main.admin_dashboard'))
 
 @bp.route('/admin/atualizar/<int:id>', methods=['POST'])
 def atualizar(id):
@@ -681,7 +654,6 @@ except Exception:
     MATPLOTLIB_AVAILABLE = False
 
 @bp.route('/admin/exportar_relatorio_pdf')
-
 
 def exportar_relatorio_pdf():
     # -------------------------
