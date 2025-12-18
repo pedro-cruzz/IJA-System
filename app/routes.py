@@ -170,56 +170,41 @@ def admin_dashboard():
 
 @bp.route('/admin/exportar_excel')
 def exportar_excel():
-    # Permite APENAS admin e operario
     if 'user_id' not in session or session.get('user_tipo') not in ['admin', 'operario']:
         flash('Permissão negada para exportar.', 'danger')
         return redirect(url_for('main.admin_dashboard'))
 
     try:
-        # --- Captura filtros ---
         filtro_status = request.args.get("status")
         filtro_unidade = request.args.get("unidade")
         filtro_regiao = request.args.get("regiao")
 
-        # Query base com JOIN explícito
-        query = db.session.query(Solicitacao).join(Usuario, Usuario.id == Solicitacao.usuario_id)
+        # Usar joinedload evita o erro de "Lazy Loading" fora da sessão no Postgres
+        query = db.session.query(Solicitacao).join(Usuario).options(joinedload(Solicitacao.autor))
 
-        # Filtros de String (ilike funciona bem no Postgres para busca insensível a maiúsculas)
         if filtro_status:
             query = query.filter(Solicitacao.status == filtro_status)
-
         if filtro_unidade:
             query = query.filter(Usuario.nome_uvis.ilike(f"%{filtro_unidade}%"))
-
         if filtro_regiao:
             query = query.filter(Usuario.regiao.ilike(f"%{filtro_regiao}%"))
 
-        # Executa a busca
         pedidos = query.order_by(Solicitacao.data_criacao.desc()).all()
 
-        # --- CRIA EXCEL ---
         wb = Workbook()
         ws = wb.active
         ws.title = "Relatório de Solicitações"
 
         headers = [
-            "ID", "Unidade", "Região",
-            "Data Agendada", "Hora",
-            "Endereço Completo", 
-            "Latitude", "Longitude",
-            "Foco", "Tipo Visita", "Altura",
-            "Apoio CET?",
-            "Observação",
-            "Status", "Protocolo", "Justificativa"
+            "ID", "Unidade", "Região", "Data Agendada", "Hora",
+            "Endereço Completo", "Latitude", "Longitude",
+            "Foco", "Tipo Visita", "Altura", "Apoio CET?",
+            "Observação", "Status", "Protocolo", "Justificativa"
         ]
 
-        # Estilos (Cores e Bordas)
         header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
         header_font = Font(color="FFFFFF", bold=True)
-        thin_border = Border(
-            left=Side(style='thin'), right=Side(style='thin'),
-            top=Side(style='thin'), bottom=Side(style='thin')
-        )
+        thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
         for col_num, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col_num, value=header)
@@ -228,8 +213,11 @@ def exportar_excel():
             cell.alignment = Alignment(horizontal="center", vertical="center")
             cell.border = thin_border
 
-        # Conteúdo
         for row_num, p in enumerate(pedidos, 2):
+            # Fallback seguro para o Autor
+            uvis_nome = p.autor.nome_uvis if p.autor else "Não informado"
+            uvis_regiao = p.autor.regiao if p.autor else "Não informado"
+
             endereco_completo = (
                 f"{p.logradouro or ''}, {p.numero or ''} - "
                 f"{p.bairro or ''} - "
@@ -238,9 +226,7 @@ def exportar_excel():
             if getattr(p, 'complemento', None):
                 endereco_completo += f" - {p.complemento}"
 
-            cet_txt = "SIM" if p.apoio_cet else "NÃO"
-
-            # Formatação de Data no Python (Independente do Banco)
+            # Formatação de Data Segura
             data_formatada = ""
             if p.data_agendamento:
                 if isinstance(p.data_agendamento, (date, datetime)):
@@ -252,12 +238,10 @@ def exportar_excel():
                         data_formatada = str(p.data_agendamento)
 
             row = [
-                p.id, p.autor.nome_uvis, p.autor.regiao,
-                data_formatada, str(p.hora_agendamento or ""),
-                endereco_completo,
-                p.latitude or "", p.longitude or "",
+                p.id, uvis_nome, uvis_regiao, data_formatada, str(p.hora_agendamento or ""),
+                endereco_completo, p.latitude or "", p.longitude or "",
                 p.foco, p.tipo_visita or "", p.altura_voo or "",
-                cet_txt, p.observacao or "",
+                "SIM" if p.apoio_cet else "NÃO", p.observacao or "",
                 p.status, p.protocolo or "", p.justificativa or ""
             ]
 
@@ -268,7 +252,6 @@ def exportar_excel():
 
         ws.freeze_panes = "A2"
 
-        # Largura automática com limite de segurança
         for col in ws.columns:
             max_length = 0
             column_letter = col[0].column_letter
@@ -289,7 +272,7 @@ def exportar_excel():
         )
 
     except Exception as e:
-        db.session.rollback() # Essencial para não travar o banco no Render
+        db.session.rollback() # Limpa a transação do Postgres se algo falhar
         print(f"ERRO EXPORTAR EXCEL: {str(e)}")
         flash("Erro ao gerar o Excel. Verifique se os dados estão corretos.", "danger")
         return redirect(url_for('main.admin_dashboard'))
@@ -686,9 +669,16 @@ def exportar_relatorio_pdf():
     "NEGADO": "#e74c3c",                      # Vermelho
 }
 
-    # 4. Buscas agrupadas
+   # 4. Buscas agrupadas (CORRIGIDO PARA POSTGRES/SQLITE)
     def aplicar_filtros_agrupados(query):
-        query = query.filter(db.func.strftime('%Y-%m', Solicitacao.data_criacao) == filtro_data)
+        # Verifica se o motor do banco é PostgreSQL
+        if db.engine.name == 'postgresql':
+            # No Postgres usamos to_char
+            query = query.filter(db.func.to_char(Solicitacao.data_criacao, 'YYYY-MM') == filtro_data)
+        else:
+            # No SQLite (Local) mantemos o strftime
+            query = query.filter(db.func.strftime('%Y-%m', Solicitacao.data_criacao) == filtro_data)
+        
         if uvis_id:
             query = query.filter(Solicitacao.usuario_id == uvis_id)
         return query
@@ -727,16 +717,24 @@ def exportar_relatorio_pdf():
         .all()
     dados_unidade = [(u or "Não informado", c) for u, c in dados_unidade_raw]
 
+    
+    if db.engine.name == 'postgresql':
+            func_mes = db.func.to_char(Solicitacao.data_criacao, 'YYYY-MM')
+    else:
+            func_mes = db.func.strftime('%Y-%m', Solicitacao.data_criacao)
+
     dados_mensais_raw = (
-        db.session.query(
-            db.func.strftime('%Y-%m', Solicitacao.data_criacao).label('mes'),
-            db.func.count(Solicitacao.id)
+            db.session.query(
+                func_mes, 
+                db.func.count(Solicitacao.id)
+            )
+            .group_by(func_mes)
+            .order_by(func_mes)
+            .all()
         )
-        .group_by('mes')
-        .order_by('mes')
-        .all()
-    )
-    dados_mensais = [(m, c) for m, c in dados_mensais_raw]
+        
+        # Converte para lista de tuplas (m, c) exatamente como era antes
+    dados_mensais = [tuple(row) for row in dados_mensais_raw]
 
     # -------------------------
     # 5. Preparar documento PDF
@@ -1131,6 +1129,7 @@ def exportar_relatorio_excel():
     filtro_data = f"{ano}-{mes:02d}"
 
     # 2. Busca de Dados
+    # 2. Busca de Dados
     query_dados = db.session.query(
         Solicitacao.id,
         Solicitacao.status,
@@ -1149,11 +1148,15 @@ def exportar_relatorio_excel():
         Solicitacao.longitude,
         Usuario.nome_uvis,
         Usuario.regiao
-    ) \
-        .join(Usuario, Usuario.id == Solicitacao.usuario_id) \
-        .filter(db.func.strftime('%Y-%m', Solicitacao.data_criacao) == filtro_data)
+    ).join(Usuario, Usuario.id == Solicitacao.usuario_id)
 
-    # APLICAÇÃO DO NOVO FILTRO
+    # Filtro de Data Compatível (O ponto chave da correção)
+    if db.engine.name == 'postgresql':
+        query_dados = query_dados.filter(db.func.to_char(Solicitacao.data_criacao, 'YYYY-MM') == filtro_data)
+    else:
+        query_dados = query_dados.filter(db.func.strftime('%Y-%m', Solicitacao.data_criacao) == filtro_data)
+
+    # Filtro opcional por Unidade
     if uvis_id:
         query_dados = query_dados.filter(Solicitacao.usuario_id == uvis_id)
 
