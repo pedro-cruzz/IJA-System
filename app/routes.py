@@ -535,135 +535,118 @@ def aplicar_filtros_base(query, filtro_data, uvis_id):
 # =======================================================================
 # ROTA 1: Visualização do Relatório (HTML)
 # =======================================================================
+from flask import session, redirect, url_for, request, render_template
+from datetime import datetime
+from app import db
+from app.models import Usuario, Solicitacao
+import sqlalchemy
+
 @bp.route('/relatorios', methods=['GET'])
 def relatorios():
     if 'user_id' not in session:
         return redirect(url_for('main.login'))
 
-    # 1. Parâmetros de Filtro
-    mes_atual = request.args.get('mes', datetime.now().month, type=int)
-    ano_atual = request.args.get('ano', datetime.now().year, type=int)
-    uvis_id = request.args.get('uvis_id', type=int)
-    filtro_data = f"{ano_atual}-{mes_atual:02d}"
+    try:
+        # 1. Parâmetros de Filtro
+        mes_atual = request.args.get('mes', datetime.now().month, type=int)
+        ano_atual = request.args.get('ano', datetime.now().year, type=int)
+        uvis_id = request.args.get('uvis_id', type=int)
+        filtro_data = f"{ano_atual}-{mes_atual:02d}"
 
-    # 2. UVIS disponíveis para o dropdown
-    uvis_disponiveis = db.session.query(Usuario.id, Usuario.nome_uvis) \
-        .filter(Usuario.tipo_usuario == 'uvis') \
-        .order_by(Usuario.nome_uvis) \
-        .all()
+        # 2. UVIS disponíveis para o dropdown
+        uvis_disponiveis = db.session.query(Usuario.id, Usuario.nome_uvis) \
+            .filter(Usuario.tipo_usuario == 'uvis') \
+            .order_by(Usuario.nome_uvis) \
+            .all()
 
-    # 3. Histórico Mensal (usado para gerar anos disponíveis - não filtra por uvis_id)
-    dados_mensais_raw = (
-        db.session.query(
-            db.func.strftime('%Y-%m', Solicitacao.data_criacao).label('mes'),
-            db.func.count(Solicitacao.id)
+        # 3. Histórico Mensal (CORRIGIDO PARA POSTGRESQL E SQLITE)
+        if db.engine.name == 'postgresql':
+            # Função para PostgreSQL
+            func_mes = db.func.to_char(Solicitacao.data_criacao, 'YYYY-MM')
+        else:
+            # Função para SQLite (Local)
+            func_mes = db.func.strftime('%Y-%m', Solicitacao.data_criacao)
+
+        dados_mensais_raw = (
+            db.session.query(
+                func_mes.label('mes_label'),
+                db.func.count(Solicitacao.id)
+            )
+            .group_by('mes_label')
+            .order_by('mes_label')
+            .all()
         )
-        .group_by('mes')
-        .order_by('mes')
-        .all()
-    )
-    dados_mensais = [tuple(row) for row in dados_mensais_raw]
+        dados_mensais = [tuple(row) for row in dados_mensais_raw]
 
-    anos_disponiveis = sorted(list(set([d[0].split('-')[0] for d in dados_mensais])), reverse=True)
-    if not anos_disponiveis:
-        anos_disponiveis = [ano_atual]
+        anos_disponiveis = sorted(list(set([d[0].split('-')[0] for d in dados_mensais])), reverse=True) if dados_mensais else [ano_atual]
 
-    # 4. Totalizações (usando a função de filtro)
-    base_query = db.session.query(Solicitacao)
+        # 4. Totalizações
+        base_query = db.session.query(Solicitacao)
 
-    total_solicitacoes = aplicar_filtros_base(base_query, filtro_data, uvis_id).count()
-    
-    total_aprovadas = aplicar_filtros_base(base_query, filtro_data, uvis_id) \
-        .filter(Solicitacao.status == "APROVADO").count()
+        total_solicitacoes = aplicar_filtros_base(base_query, filtro_data, uvis_id).count()
+        
+        # Otimização: Status fixos
+        total_aprovadas = aplicar_filtros_base(base_query, filtro_data, uvis_id).filter(Solicitacao.status == "APROVADO").count()
+        total_aprovadas_com_recomendacoes = aplicar_filtros_base(base_query, filtro_data, uvis_id).filter(Solicitacao.status == "APROVADO COM RECOMENDAÇÕES").count()
+        total_recusadas = aplicar_filtros_base(base_query, filtro_data, uvis_id).filter(Solicitacao.status == "NEGADO").count()
+        total_analise = aplicar_filtros_base(base_query, filtro_data, uvis_id).filter(Solicitacao.status == "EM ANÁLISE").count()
+        total_pendentes = aplicar_filtros_base(base_query, filtro_data, uvis_id).filter(Solicitacao.status == "PENDENTE").count()
 
-    total_aprovadas_com_recomendacoes = aplicar_filtros_base(base_query, filtro_data, uvis_id) \
-        .filter(Solicitacao.status == "APROVADO COM RECOMENDAÇÕES").count()
+        # 5. Consultas Agrupadas (Região, Status, Foco, etc.)
+        def formatar_dados(query):
+            return [tuple(row) for row in query.all()]
 
-    total_recusadas = aplicar_filtros_base(base_query, filtro_data, uvis_id) \
-        .filter(Solicitacao.status == "NEGADO").count()
+        # Região
+        query_regiao = db.session.query(Usuario.regiao, db.func.count(Solicitacao.id)).join(Usuario, Usuario.id == Solicitacao.usuario_id)
+        dados_regiao = formatar_dados(aplicar_filtros_base(query_regiao, filtro_data, uvis_id).group_by(Usuario.regiao))
 
-    total_analise = aplicar_filtros_base(base_query, filtro_data, uvis_id) \
-        .filter(Solicitacao.status == "EM ANÁLISE").count()
+        # Status
+        query_status = db.session.query(Solicitacao.status, db.func.count(Solicitacao.id))
+        dados_status = formatar_dados(aplicar_filtros_base(query_status, filtro_data, uvis_id).group_by(Solicitacao.status))
 
-    total_pendentes = aplicar_filtros_base(base_query, filtro_data, uvis_id) \
-        .filter(Solicitacao.status == "PENDENTE").count()
+        # Foco
+        query_foco = db.session.query(Solicitacao.foco, db.func.count(Solicitacao.id))
+        dados_foco = formatar_dados(aplicar_filtros_base(query_foco, filtro_data, uvis_id).group_by(Solicitacao.foco))
+        
+        # Tipo Visita
+        query_tipo_visita = db.session.query(Solicitacao.tipo_visita, db.func.count(Solicitacao.id))
+        dados_tipo_visita = formatar_dados(aplicar_filtros_base(query_tipo_visita, filtro_data, uvis_id).group_by(Solicitacao.tipo_visita))
+        
+        # Altura de Voo
+        query_altura_voo = db.session.query(Solicitacao.altura_voo, db.func.count(Solicitacao.id))
+        dados_altura_voo = formatar_dados(aplicar_filtros_base(query_altura_voo, filtro_data, uvis_id).group_by(Solicitacao.altura_voo))
 
-    # 5. Consultas Agrupadas (usando a função de filtro)
+        # Unidade (UVIS)
+        query_unidade = db.session.query(Usuario.nome_uvis, db.func.count(Solicitacao.id)).join(Usuario, Usuario.id == Solicitacao.usuario_id).filter(Usuario.tipo_usuario == 'uvis')
+        dados_unidade = formatar_dados(aplicar_filtros_base(query_unidade, filtro_data, uvis_id).group_by(Usuario.nome_uvis))
 
-    # Região (requer JOIN)
-    query_regiao = db.session.query(Usuario.regiao, db.func.count(Solicitacao.id)) \
-        .join(Usuario, Usuario.id == Solicitacao.usuario_id)
-    dados_regiao_raw = aplicar_filtros_base(query_regiao, filtro_data, uvis_id) \
-        .group_by(Usuario.regiao) \
-        .order_by(db.func.count(Solicitacao.id).desc()) \
-        .all()
-    dados_regiao = [tuple(row) for row in dados_regiao_raw]
+        return render_template(
+            'relatorios.html',
+            total_solicitacoes=total_solicitacoes,
+            total_aprovadas=total_aprovadas,
+            total_aprovadas_com_recomendacoes=total_aprovadas_com_recomendacoes,
+            total_recusadas=total_recusadas,
+            total_analise=total_analise,
+            total_pendentes=total_pendentes,
+            dados_regiao=dados_regiao,
+            dados_status=dados_status,
+            dados_foco=dados_foco,
+            dados_tipo_visita=dados_tipo_visita,
+            dados_altura_voo=dados_altura_voo,
+            dados_unidade=dados_unidade,
+            dados_mensais=dados_mensais,
+            mes_selecionado=mes_atual,
+            ano_selecionado=ano_atual,
+            anos_disponiveis=anos_disponiveis,
+            uvis_id_selecionado=uvis_id,
+            uvis_disponiveis=uvis_disponiveis
+        )
 
-    # Status
-    query_status = db.session.query(Solicitacao.status, db.func.count(Solicitacao.id))
-    dados_status_raw = aplicar_filtros_base(query_status, filtro_data, uvis_id) \
-        .group_by(Solicitacao.status) \
-        .order_by(db.func.count(Solicitacao.id).desc()) \
-        .all()
-    dados_status = [tuple(row) for row in dados_status_raw]
-
-    # Foco
-    query_foco = db.session.query(Solicitacao.foco, db.func.count(Solicitacao.id))
-    dados_foco_raw = aplicar_filtros_base(query_foco, filtro_data, uvis_id) \
-        .group_by(Solicitacao.foco) \
-        .order_by(db.func.count(Solicitacao.id).desc()) \
-        .all()
-    dados_foco = [tuple(row) for row in dados_foco_raw]
-    
-    # Tipo Visita
-    query_tipo_visita = db.session.query(Solicitacao.tipo_visita, db.func.count(Solicitacao.id))
-    dados_tipo_visita_raw = aplicar_filtros_base(query_tipo_visita, filtro_data, uvis_id) \
-        .group_by(Solicitacao.tipo_visita) \
-        .order_by(db.func.count(Solicitacao.id).desc()) \
-        .all()
-    dados_tipo_visita = [tuple(row) for row in dados_tipo_visita_raw]
-    
-    # Altura de Voo
-    query_altura_voo = db.session.query(Solicitacao.altura_voo, db.func.count(Solicitacao.id))
-    dados_altura_voo_raw = aplicar_filtros_base(query_altura_voo, filtro_data, uvis_id) \
-        .group_by(Solicitacao.altura_voo) \
-        .order_by(db.func.count(Solicitacao.id).desc()) \
-        .all()
-    dados_altura_voo = [tuple(row) for row in dados_altura_voo_raw]
-
-    # Unidade (UVIS) - Requer JOIN e filtro adicional de tipo_usuario
-    query_unidade = db.session.query(Usuario.nome_uvis, db.func.count(Solicitacao.id)) \
-        .join(Usuario, Usuario.id == Solicitacao.usuario_id) \
-        .filter(Usuario.tipo_usuario == 'uvis')
-    dados_unidade_raw = aplicar_filtros_base(query_unidade, filtro_data, uvis_id) \
-        .group_by(Usuario.nome_uvis) \
-        .order_by(db.func.count(Solicitacao.id).desc()) \
-        .all()
-    dados_unidade = [tuple(row) for row in dados_unidade_raw]
-
-    # 6. Retorno
-    return render_template(
-        'relatorios.html',
-        total_solicitacoes=total_solicitacoes,
-        total_aprovadas=total_aprovadas,
-        total_aprovadas_com_recomendacoes=total_aprovadas_com_recomendacoes,
-        total_recusadas=total_recusadas,
-        total_analise=total_analise,
-        total_pendentes=total_pendentes,
-        dados_regiao=dados_regiao,
-        dados_status=dados_status,
-        dados_foco=dados_foco,
-        dados_tipo_visita=dados_tipo_visita,
-        dados_altura_voo=dados_altura_voo,
-        dados_unidade=dados_unidade,
-        dados_mensais=dados_mensais,
-        mes_selecionado=mes_atual,
-        ano_selecionado=ano_atual,
-        anos_disponiveis=anos_disponiveis,
-        uvis_id_selecionado=uvis_id, # Passa o ID selecionado
-        uvis_disponiveis=uvis_disponiveis # Passa a lista completa para o dropdown
-    )
-
+    except Exception as e:
+        db.session.rollback() # Limpa o erro para não travar o site
+        print(f"ERRO NOS RELATÓRIOS: {str(e)}")
+        # Em produção, redirecionamos para uma página de erro ou voltamos com mensagem
+        return render_template("erro.html", codigo="500", titulo="Erro nos Relatórios", mensagem="Houve um erro técnico ao processar os dados. Certifique-se de que existem solicitações cadastradas.")
 
 # =======================================================================
 # ROTA 2: Exportar PDF (Com Filtro UVIS)
@@ -1409,136 +1392,141 @@ def deletar(id):
 
     flash(f"Pedido #{pedido_id} da {autor_nome} deletado permanentemente.", "success")
     return redirect(url_for('main.admin_dashboard'))
+
 @bp.route("/agenda")
 def agenda():
     if "user_id" not in session:
         return redirect(url_for("main.login"))
 
-    user_tipo = session.get("user_tipo")
-    user_id = session.get("user_id")
+    try:
+        user_tipo = session.get("user_tipo")
+        user_id = session.get("user_id")
 
-    # ----------------------------
-    # Filtros (GET)
-    # ----------------------------
-    filtro_status = request.args.get("status") or None
-    filtro_uvis_id = request.args.get("uvis_id", type=int)
+        # ----------------------------
+        # Filtros (GET)
+        # ----------------------------
+        filtro_status = request.args.get("status") or None
+        filtro_uvis_id = request.args.get("uvis_id", type=int)
 
-    mes = request.args.get("mes", datetime.now().month, type=int)
-    ano = request.args.get("ano", datetime.now().year, type=int)
+        mes = request.args.get("mes", datetime.now().month, type=int)
+        ano = request.args.get("ano", datetime.now().year, type=int)
 
-    # link vindo da notificação (você já usa ?d=YYYY-MM-DD lá)
-    d = request.args.get("d")  # opcional
-    initial_date = d or f"{ano}-{mes:02d}-01"
+        d = request.args.get("d")  # opcional
+        initial_date = d or f"{ano}-{mes:02d}-01"
 
-    # ----------------------------
-    # Query base + permissões
-    # ----------------------------
-    query = Solicitacao.query.options(joinedload(Solicitacao.autor))
+        # ----------------------------
+        # Query base + permissões
+        # ----------------------------
+        query = Solicitacao.query.options(joinedload(Solicitacao.autor))
 
-    # UVIS só vê os próprios (e não pode filtrar outra UVIS)
-    if user_tipo not in ["admin", "operario", "visualizar"]:
-        query = query.filter(Solicitacao.usuario_id == user_id)
-        filtro_uvis_id = None
-    else:
-        # Admin/Operário/Visualizar podem filtrar por UVIS
-        if filtro_uvis_id:
-            query = query.filter(Solicitacao.usuario_id == filtro_uvis_id)
+        if user_tipo not in ["admin", "operario", "visualizar"]:
+            query = query.filter(Solicitacao.usuario_id == user_id)
+            filtro_uvis_id = None
+        else:
+            if filtro_uvis_id:
+                query = query.filter(Solicitacao.usuario_id == filtro_uvis_id)
 
-    # Filtro por status
-    if filtro_status:
-        query = query.filter(Solicitacao.status == filtro_status)
+        if filtro_status:
+            query = query.filter(Solicitacao.status == filtro_status)
 
-    # Filtro por mês/ano (pela data do agendamento)
-    filtro_mesano = f"{ano}-{mes:02d}"
-    query = query.filter(db.func.strftime("%Y-%m", Solicitacao.data_agendamento) == filtro_mesano)
+        # --- CORREÇÃO DE COMPATIBILIDADE DE DATA (POSTGRES VS SQLITE) ---
+        filtro_mesano = f"{ano}-{mes:02d}"
+        if db.engine.name == 'postgresql':
+            query = query.filter(db.func.to_char(Solicitacao.data_agendamento, "YYYY-MM") == filtro_mesano)
+        else:
+            query = query.filter(db.func.strftime("%Y-%m", Solicitacao.data_agendamento) == filtro_mesano)
 
-    eventos = query.all()
+        eventos = query.all()
 
-    # ----------------------------
-    # UVIS disponíveis (dropdown)
-    # ----------------------------
-    uvis_disponiveis = []
-    if user_tipo in ["admin", "operario", "visualizar"]:
-        uvis_disponiveis = (
-            db.session.query(Usuario.id, Usuario.nome_uvis)
-            .filter(Usuario.tipo_usuario == "uvis")
-            .order_by(Usuario.nome_uvis)
+        # ----------------------------
+        # UVIS disponíveis e Anos
+        # ----------------------------
+        uvis_disponiveis = []
+        if user_tipo in ["admin", "operario", "visualizar"]:
+            uvis_disponiveis = (
+                db.session.query(Usuario.id, Usuario.nome_uvis)
+                .filter(Usuario.tipo_usuario == "uvis")
+                .order_by(Usuario.nome_uvis)
+                .all()
+            )
+
+        # --- CORREÇÃO NOS ANOS DISPONÍVEIS ---
+        if db.engine.name == 'postgresql':
+            func_ano = db.func.to_char(Solicitacao.data_agendamento, "YYYY")
+        else:
+            func_ano = db.func.strftime("%Y", Solicitacao.data_agendamento)
+
+        anos_raw = (
+            db.session.query(func_ano)
+            .filter(Solicitacao.data_agendamento.isnot(None))
+            .distinct()
+            .order_by(func_ano.desc())
             .all()
         )
+        anos_disponiveis = [int(a[0]) for a in anos_raw if a and a[0]]
+        if not anos_disponiveis:
+            anos_disponiveis = [datetime.now().year]
 
-    # Anos disponíveis (pra select)
-    anos_raw = (
-        db.session.query(db.func.strftime("%Y", Solicitacao.data_agendamento))
-        .filter(Solicitacao.data_agendamento.isnot(None))
-        .distinct()
-        .order_by(db.func.strftime("%Y", Solicitacao.data_agendamento).desc())
-        .all()
-    )
-    anos_disponiveis = [int(a[0]) for a in anos_raw if a and a[0]]
-    if not anos_disponiveis:
-        anos_disponiveis = [datetime.now().year]
+        # ----------------------------
+        # Monta eventos p/ FullCalendar
+        # ----------------------------
+        agenda_eventos = []
 
-    # ----------------------------
-    # Monta eventos p/ FullCalendar
-    # ----------------------------
-    agenda_eventos = []
+        for e in eventos:
+            if not e.data_agendamento:
+                continue
 
-    for e in eventos:
-        if not e.data_agendamento:
-            continue
+            data = e.data_agendamento.strftime("%Y-%m-%d")
+            hora = e.hora_agendamento.strftime("%H:%M") if e.hora_agendamento else "00:00"
 
-        data = e.data_agendamento.strftime("%Y-%m-%d")
-        hora = e.hora_agendamento.strftime("%H:%M") if e.hora_agendamento else "00:00"
-
-        ev = {
-            "id": str(e.id),  # (opcional, mas útil)
-            "title": f"{e.foco} - {e.autor.nome_uvis}",
-            "start": f"{data}T{hora}",
-            "color": (
-                "#198754" if e.status == "APROVADO" else
-                "#ffa023" if e.status == "APROVADO COM RECOMENDAÇÕES" else
-                "#dc3545" if e.status == "NEGADO" else
-                "#e9fa05" if e.status == "EM ANÁLISE" else
-                "#0d6efd"
-            ),
-            "extendedProps": {
-                "is_admin": (user_tipo == "admin"),
-                "foco": e.foco,
-                "uvis": e.autor.nome_uvis,
-                "hora": hora,
-                "status": e.status
+            ev = {
+                "id": str(e.id),
+                "title": f"{e.foco} - {e.autor.nome_uvis}",
+                "start": f"{data}T{hora}",
+                "color": (
+                    "#198754" if e.status == "APROVADO" else
+                    "#ffa023" if e.status == "APROVADO COM RECOMENDAÇÕES" else
+                    "#dc3545" if e.status == "NEGADO" else
+                    "#e9fa05" if e.status == "EM ANÁLISE" else
+                    "#0d6efd"
+                ),
+                "extendedProps": {
+                    "is_admin": (user_tipo == "admin"),
+                    "foco": e.foco,
+                    "uvis": e.autor.nome_uvis,
+                    "hora": hora,
+                    "status": e.status
+                }
             }
-        }
 
-        if user_tipo == "admin":
-            ev["url"] = url_for("main.admin_editar_completo", id=e.id)
+            if user_tipo == "admin":
+                ev["url"] = url_for("main.admin_editar_completo", id=e.id)
 
-        agenda_eventos.append(ev)
+            agenda_eventos.append(ev)
 
-    status_opcoes = [
-        "PENDENTE",
-        "EM ANÁLISE",
-        "APROVADO",
-        "APROVADO COM RECOMENDAÇÕES",
-        "NEGADO",
-    ]
+        status_opcoes = ["PENDENTE", "EM ANÁLISE", "APROVADO", "APROVADO COM RECOMENDAÇÕES", "NEGADO"]
 
-    return render_template(
-        "agenda.html",
-        eventos_json=json.dumps(agenda_eventos),
-        uvis_disponiveis=uvis_disponiveis,
-        status_opcoes=status_opcoes,
-        filtros={
-            "uvis_id": filtro_uvis_id,
-            "status": filtro_status,
-            "mes": mes,
-            "ano": ano,
-        },
-        anos_disponiveis=anos_disponiveis,
-        initial_date=initial_date,
-        pode_filtrar_uvis=(user_tipo in ["admin", "operario", "visualizar"]),
-    )
+        return render_template(
+            "agenda.html",
+            eventos_json=json.dumps(agenda_eventos),
+            uvis_disponiveis=uvis_disponiveis,
+            status_opcoes=status_opcoes,
+            filtros={
+                "uvis_id": filtro_uvis_id,
+                "status": filtro_status,
+                "mes": mes,
+                "ano": ano,
+            },
+            anos_disponiveis=anos_disponiveis,
+            initial_date=initial_date,
+            pode_filtrar_uvis=(user_tipo in ["admin", "operario", "visualizar"]),
+        )
 
+    except Exception as e:
+        db.session.rollback() # MUITO IMPORTANTE para o Render
+        print(f"ERRO NA AGENDA: {str(e)}")
+        return render_template("erro.html", codigo="500", titulo="Erro na Agenda", mensagem="Ocorreu um erro ao carregar os compromissos técnicos.")
+    
 @bp.route("/agenda/exportar_excel")
 def agenda_exportar_excel():
     if "user_id" not in session:
