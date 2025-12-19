@@ -37,7 +37,7 @@ body {
   --color-text-muted: #718096;
   --color-filter: #424649;
   --color-success: #2f855a;
-  --color-warning: #c05621;
+  --color-warning: #f3e526;
   --color-danger: #e53e3e;
   --color-recomended: #F7630C;
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
@@ -192,12 +192,15 @@ body.sidebar-collapsed .app-content { margin-left: var(--sidebar-width-collapsed
 .card.info.status-danger::before { background: var(--color-danger); }
 .card.info.status-warning::before { background: var(--color-warning); }
 .card.info.status-info::before { background: var(--color-accent); }
+.card.info.status-recomended::before { background: var(--color-recomended); }
 
 .text-primary { color: var(--color-primary) !important; }
 .text-success { color: var(--color-success) !important; }
 .text-danger { color: var(--color-danger) !important; }
 .text-warning { color: var(--color-warning) !important; }
 .text-info { color: var(--color-accent) !important; }
+.text-recomended { color: var(--color-recomended) !important; }
+
 .text-dark { color: var(--color-primary-dark) !important; }
 .text-muted { color: var(--color-text-muted) !important; }
 
@@ -247,8 +250,9 @@ body.dark-mode {
   --color-accent: #00e0ff;
   --color-accent-hover: #00b4cc;
   --color-success: #38a169;
-  --color-warning: #eab308;
+  --color-warning: #eac808;
   --color-danger:  #e53e3e;
+  --color-recomended: #e66f00;
   --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.45);
   --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.6);
   --shadow-lg: 0 10px 18px -3px rgba(0, 0, 0, 0.75);
@@ -269,7 +273,7 @@ body.dark-mode .card.info .text-primary { color: var(--color-primary) !important
 body.dark-mode .card.info .text-success { color: var(--color-success) !important; }
 body.dark-mode .card.info .text-danger { color: var(--color-danger) !important; }
 body.dark-mode .card.info .text-warning { color: var(--color-warning) !important; }
-body.dark-mode .card.info .text-info { color: var(--color-accent) !important; }
+body.dark-mode .card.info .text-recomended { color: var(--color-recomended) !important; }
 
 body.dark-mode .form-control, body.dark-mode .form-select { background: #1c2b3f; border: 1px solid #334155; color: var(--color-text-main); }
 body.dark-mode .form-control:focus, body.dark-mode .form-select:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(0, 224, 255, 0.25); }

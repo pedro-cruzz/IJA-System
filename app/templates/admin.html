@@ -133,6 +133,7 @@
                 <option value="PENDENTE" {{ 'selected' if request.args.get('status')=='PENDENTE' else '' }}>⚪️ Pendente</option>
                 <option value="EM ANÁLISE" {{ 'selected' if request.args.get('status')=='EM ANÁLISE' else '' }}>🟡 Em Análise</option>
                 <option value="APROVADO" {{ 'selected' if request.args.get('status')=='APROVADO' else '' }}>🟢 Aprovado</option>
+                <option value="APROVADO COM RECOMENDAÇÕES" {{ 'selected' if request.args.get('status')=='APROVADO COM RECOMENDAÇÕES' else '' }}>🟠 aprovado c/ recomendações</option>
                 <option value="NEGADO" {{ 'selected' if request.args.get('status')=='NEGADO' else '' }}>🔴 Negado</option>
             </select>
         </div>
@@ -280,9 +281,9 @@
                                 <select name="status" class="form-select form-select-sm mb-2">
                                     <option value="PENDENTE" {% if p.status=='PENDENTE' %}selected{% endif %}>⚪️ Pendente</option>
                                     <option value="EM ANÁLISE" {% if p.status=='EM ANÁLISE' %}selected{% endif %}>🟡 Em Análise</option>
-                                    <option value="APROVADO" {% if p.status=='APROVADO' %}selected{% endif %}>🟢 APROVAR</option>
-                                    <option value="APROVADO COM RECOMENDAÇÕES" {% if p.status=='APROVADO COM RECOMENDAÇÕES' %}selected{% endif %}>🟠 APROVADO COM RECOMENDAÇÕES</option>
-                                    <option value="NEGADO" {% if p.status=='NEGADO' %}selected{% endif %}>🔴 NEGAR</option>
+                                    <option value="APROVADO" {% if p.status=='APROVADO' %}selected{% endif %}>🟢 Aprovar</option>
+                                    <option value="APROVADO COM RECOMENDAÇÕES" {% if p.status=='APROVADO COM RECOMENDAÇÕES' %}selected{% endif %}>🟠 Aprovado c/ recomendações</option>
+                                    <option value="NEGADO" {% if p.status=='NEGADO' %}selected{% endif %}>🔴 Negar</option>
                                 </select>
 
                                 <label class="small fw-bold text-muted">Justificativa (se negar)</label>
@@ -302,7 +303,7 @@
                             <label class="small fw-bold text-muted">Status Atual:</label>
                             <div class="text-center mb-3">
                                 <span class="badge 
-                                    {% if p.status=='PENDENTE' %}bg-secondary{% elif p.status=='EM ANÁLISE' %}bg-warning text-dark{% elif p.status=='APROVADO' %}bg-success{% elif p.status=='NEGADO' %}bg-danger{% endif %} 
+                                    {% if p.status=='PENDENTE' %}bg-secondary{% elif p.status=='EM ANÁLISE' %}bg-warning{% elif p.status=='APROVADO' %}{% elif p.status=='EM ANÁLISE' %}bg-recomended{% elif p.status=='NEGADO' %}bg-danger{% endif %} 
                                     fs-6 p-2">
                                     {{ p.status }}
                                 </span>
