@@ -1,16 +1,16 @@
 {% extends "base.html" %} 
+
 {% block content %}
-<div>
+<div class="container-fluid py-4" style="max-width: 1200px;">
   
-  {# --- Cabeçalho (Estilo Limpo) --- #}
+  {# --- Cabeçalho --- #}
   <div class="d-flex align-items-center mb-4">
       <h2 class="text-dark m-0">
-          <i class="bi bi-send-fill me-2"></i> Novo Pedido de Voo
+          <i class="bi bi-send-fill me-2 text-primary"></i> Novo Pedido de Voo
       </h2>
   </div>
 
   {# --- Card Principal --- #}
-  {# Adicionei 'info status-primary' para manter a borda azul lateral #}
   <div class="card info status-primary shadow-sm rounded-4 border-0">
     <div class="card-body p-4">
       
@@ -105,13 +105,13 @@
              <label class="form-label fw-bold small text-muted">
                 <i class="bi bi-globe me-1 text-primary"></i> Latitude
              </label>
-             <input type="text" name="latitude" class="form-control form-control-sm" placeholder="-23.XXXXXX">
+             <input type="text" name="latitude" class="form-control form-control-sm font-monospace" placeholder="-23.XXXXXX">
            </div>
            <div class="col-md-6">
              <label class="form-label fw-bold small text-muted">
                 <i class="bi bi-globe me-1 text-primary"></i> Longitude
              </label>
-             <input type="text" name="longitude" class="form-control form-control-sm" placeholder="-46.XXXXXX">
+             <input type="text" name="longitude" class="form-control form-control-sm font-monospace" placeholder="-46.XXXXXX">
            </div>
         </div>
 
@@ -142,7 +142,6 @@
             </label>
             <select class="form-select" name="altura_voo" required>
               <option value="" selected disabled>Selecione...</option>
-              </option>
               <option value="10m">10 Metros</option>
               <option value="20m">20 Metros</option>
               <option value="30m">30 Metros</option>
@@ -198,7 +197,7 @@
         {# BOTÕES #}
         <div class="d-flex justify-content-end gap-2 mt-5">
           <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-danger px-4">
-             <i class="bi bi-x-lg me-1"></i> Cancelar
+              <i class="bi bi-x-lg me-1"></i> Cancelar
           </a>
           <button type="submit" class="btn btn-primary px-5 shadow-sm fw-bold">
             <i class="bi bi-send me-1"></i> Enviar Pedido
@@ -222,7 +221,7 @@
             let val = this.value.replace(/\D/g, "");
 
             if (val.length === 8) {
-                // Adiciona classe de loading do CSS (spinner no canto do input)
+                // Adiciona classe de loading
                 this.classList.add('loading-spinner');
                 this.disabled = true;
 
@@ -245,14 +244,34 @@
                             document.getElementById("cidade").value = data.localidade || "";
                             document.getElementById("uf").value = data.uf || "";
                             
-                            // Foca no número para agilizar
+                            // Foca no número
                             document.querySelector('input[name="numero"]').focus();
                         } else {
+                            if(typeof Swal !== 'undefined'){
+                                Swal.fire({
+                                    toast: true,
+                                    position: 'top-end',
+                                    icon: 'warning',
+                                    title: 'CEP não encontrado.',
+                                    showConfirmButton: false,
+                                    timer: 3000,
+                                    customClass: {
+                                        popup: document.body.classList.contains('dark-mode') ? 'swal2-dark-mode' : ''
+                                    }
+                                });
+                            }
+                        }
+                    })
+                    .catch(() => {
+                        this.classList.remove('loading-spinner');
+                        this.disabled = false;
+                        
+                        if(typeof Swal !== 'undefined'){
                             Swal.fire({
                                 toast: true,
                                 position: 'top-end',
-                                icon: 'warning',
-                                title: 'CEP não encontrado.',
+                                icon: 'error',
+                                title: 'Erro ao consultar CEP.',
                                 showConfirmButton: false,
                                 timer: 3000,
                                 customClass: {
@@ -260,21 +279,6 @@
                                 }
                             });
                         }
-                    })
-                    .catch(() => {
-                        this.classList.remove('loading-spinner');
-                        this.disabled = false;
-                        Swal.fire({
-                            toast: true,
-                            position: 'top-end',
-                            icon: 'error',
-                            title: 'Erro ao consultar CEP.',
-                            showConfirmButton: false,
-                            timer: 3000,
-                            customClass: {
-                                popup: document.body.classList.contains('dark-mode') ? 'swal2-dark-mode' : ''
-                            }
-                        });
                     });
             }
           });

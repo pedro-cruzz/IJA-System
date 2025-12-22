@@ -1,173 +1,179 @@
 {% extends "base.html" %}
+
 {% block content %}
+<div class="container-fluid py-4" style="max-width: 1200px;">
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    
-    <h2 class="text-dark">
-        <i class="bi bi-calendar-event-fill mb-2 text-primary"></i> Agenda
-    </h2>
-
-    {% if current_user.is_authenticated and current_user.tipo_usuario == "admin" %}
-    <div class="d-flex gap-2">
+    <div class="d-flex justify-content-between align-items-center mb-4">
         
-        {# Exportar Tudo #}
-        <a href="{{ url_for('main.agenda_exportar_excel', all=1) }}" 
-           class="btn btn-outline-success d-flex align-items-center gap-2"
-           title="Baixar base completa sem filtros">
-            <i class="bi bi-download"></i> <span class="d-none d-md-inline">Exportar Tudo</span>
-        </a>
+        <h2 class="text-dark m-0 fw-bold">
+            <i class="bi bi-calendar-event-fill me-2 text-primary"></i> Agenda
+        </h2>
 
-        {# Exportar Filtro Atual #}
-        <a href="{{ url_for('main.agenda_exportar_excel', **request.args.to_dict()) }}" 
-           class="btn btn-success text-white d-flex align-items-center gap-2 shadow-sm">
-            <i class="bi bi-file-earmark-excel"></i> Exportar Atual
-        </a>
+        {% if current_user.is_authenticated and current_user.tipo_usuario == "admin" %}
+        <div class="d-flex gap-2">
+            
+            {# Exportar Tudo #}
+            <a href="{{ url_for('main.agenda_exportar_excel', all=1) }}" 
+               class="btn btn-outline-success d-flex align-items-center gap-2"
+               title="Baixar base completa sem filtros">
+                <i class="bi bi-download"></i> <span class="d-none d-md-inline">Exportar Tudo</span>
+            </a>
 
-    </div>
-    {% endif %}
+            {# Exportar Filtro Atual #}
+            <a href="{{ url_for('main.agenda_exportar_excel', **request.args.to_dict()) }}" 
+               class="btn btn-success text-white d-flex align-items-center gap-2 shadow-sm">
+                <i class="bi bi-file-earmark-excel"></i> Exportar Atual
+            </a>
 
-</div>
-
-<form method="get" action="{{ url_for('main.agenda') }}" class="card p-3 mb-4 shadow-sm rounded-4 border-0">
-    <div class="row g-2 align-items-end">
-
-        {# CAMPO: UVIS (Se permitido) #}
-        {% if pode_filtrar_uvis %}
-        <div class="col-md-3">
-            <label class="small text-muted">UVIS:</label>
-            <select class="form-select form-select-sm" name="uvis_id">
-                <option value="">Todas</option>
-                {% for id, nome in uvis_disponiveis %}
-                    <option value="{{ id }}" {% if filtros.uvis_id|int == id|int %}selected{% endif %}>{{ nome }}</option>
-                {% endfor %}
-            </select>
         </div>
         {% endif %}
 
-        {# CAMPO: STATUS #}
-        <div class="col-md-3">
-            <label class="small text-muted">Status:</label>
-            <select class="form-select form-select-sm" name="status">
-                <option value="">Todos</option>
-                {% for s in status_opcoes %}
-                    <option value="{{ s }}" {% if filtros.status == s %}selected{% endif %}>{{ s }}</option>
-                {% endfor %}
-            </select>
-        </div>
+    </div>
 
-        {# CAMPO: MÊS #}
-        <div class="col-6 col-md-2">
-            <label class="small text-muted">Mês:</label>
-            <select class="form-select form-select-sm" name="mes">
-                {% for m in range(1, 13) %}
-                    <option value="{{ m }}" {% if filtros.mes|int == m %}selected{% endif %}>{{ "%02d"|format(m) }}</option>
-                {% endfor %}
-            </select>
-        </div>
+    <form method="get" action="{{ url_for('main.agenda') }}" class="card p-3 mb-4 shadow-sm rounded-4 border-0">
+        <div class="row g-2 align-items-end">
 
-        {# CAMPO: ANO #}
-        <div class="col-6 col-md-2">
-            <label class="small text-muted">Ano:</label>
-            <select class="form-select form-select-sm" name="ano">
-                {% for a in anos_disponiveis %}
-                    <option value="{{ a }}" {% if filtros.ano|int == a %}selected{% endif %}>{{ a }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        {# BOTÕES DE AÇÃO DO FORM #}
-        <div class="col-md-2 d-flex gap-2">
-            <button type="submit" class="btn btn-success btn-sm w-100">
-                <i class="bi bi-funnel"></i> Filtrar
-            </button>
-
-            {# Botão Limpar (Só aparece se houver filtro ativo) #}
-            {% if filtros.uvis_id or filtros.status %}
-             <a href="{{ url_for('main.agenda') }}" 
-                class="btn btn-outline-secondary btn-sm w-100" 
-                title="Limpar Filtros">
-                 <i class="bi bi-x-lg"></i>
-             </a>
+            {# CAMPO: UVIS (Se permitido) #}
+            {% if pode_filtrar_uvis %}
+            <div class="col-md-3">
+                <label class="small text-muted">UVIS:</label>
+                <select class="form-select form-select-sm" name="uvis_id">
+                    <option value="">Todas</option>
+                    {% for id, nome in uvis_disponiveis %}
+                        <option value="{{ id }}" {% if filtros.uvis_id|int == id|int %}selected{% endif %}>{{ nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
             {% endif %}
+
+            {# CAMPO: STATUS #}
+            <div class="col-md-3">
+                <label class="small text-muted">Status:</label>
+                <select class="form-select form-select-sm" name="status">
+                    <option value="">Todos</option>
+                    {% for s in status_opcoes %}
+                        <option value="{{ s }}" {% if filtros.status == s %}selected{% endif %}>{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {# CAMPO: MÊS #}
+            <div class="col-6 col-md-2">
+                <label class="small text-muted">Mês:</label>
+                <select class="form-select form-select-sm" name="mes">
+                    {% for m in range(1, 13) %}
+                        <option value="{{ m }}" {% if filtros.mes|int == m %}selected{% endif %}>{{ "%02d"|format(m) }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {# CAMPO: ANO #}
+            <div class="col-6 col-md-2">
+                <label class="small text-muted">Ano:</label>
+                <select class="form-select form-select-sm" name="ano">
+                    {% for a in anos_disponiveis %}
+                        <option value="{{ a }}" {% if filtros.ano|int == a %}selected{% endif %}>{{ a }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {# BOTÕES DE AÇÃO DO FORM #}
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-success btn-sm w-100">
+                    <i class="bi bi-funnel"></i> Filtrar
+                </button>
+
+                {# Botão Limpar (Só aparece se houver filtro ativo) #}
+                {% if filtros.uvis_id or filtros.status%}
+                 <a href="{{ url_for('main.agenda') }}" 
+                    class="btn btn-outline-secondary btn-sm w-100" 
+                    title="Limpar Filtros">
+                     <i class="bi bi-x-lg"></i>
+                 </a>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+
+    <div class="card shadow-sm rounded-4 border-0">
+        <div class="card-body p-4">
+            <div id="calendar"></div>
         </div>
     </div>
-</form>
 
-
-<div class="container mt-4 mb-4">
-  <div class="calendar-card">
-    <div class="calendar-card-header">
-      <div>
-        <p class="calendar-subtitle">
-          Visualize seus agendamentos por mês, semana ou lista.
-        </p>
-      </div>
-
-      <div class="d-none d-md-block">
-        <span
-          class="badge text-bg-primary"
-          style="border-radius: 999px; padding: 10px 12px"
-        >
-          Calendário
-        </span>
-      </div>
-    </div>
-    
-    <!-- MODAL DETALHES DO AGENDAMENTO -->
-    <div class="modal fade" id="modalEvento" tabindex="-1">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content rounded-4 shadow">
-          <div class="modal-header">
-            <h5 class="modal-title">📋 Detalhes do Agendamento</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-
-          <div class="modal-body">
-            <p><strong>UVIS:</strong> <span id="m-uvis"></span></p>
-            <p><strong>Foco:</strong> <span id="m-foco"></span></p>
-            <p><strong>Hora:</strong> <span id="m-hora"></span></p>
-            <p><strong>Status:</strong> <span id="m-status"></span></p>
-          </div>
-
-          <div class="modal-footer">
-            <button class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
-              Fechar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div id="calendar"></div>
-  </div>
 </div>
 
-<!-- FullCalendar CSS/JS -->
-<link
-  href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css"
-  rel="stylesheet"
-/>
+<div class="modal fade" id="modalEvento" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content rounded-4 shadow border-0">
+        
+        <div class="modal-header bg-light border-bottom-0 rounded-top-4">
+          <h5 class="modal-title fw-bold text-primary">
+              <i class="bi bi-info-circle me-2"></i> Detalhes do Agendamento
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+  
+        <div class="modal-body p-4">
+          
+          <div class="mb-3">
+              <label class="small text-muted fw-bold text-uppercase">UVIS</label>
+              <div id="m-uvis" class="fs-5 fw-semibold text-dark"></div>
+          </div>
+          
+          <div class="row mb-3">
+              <div class="col-6">
+                  <label class="small text-muted fw-bold text-uppercase">Horário</label>
+                  <div class="d-flex align-items-center text-primary">
+                      <i class="bi bi-clock me-2"></i> 
+                      <span id="m-hora" class="fw-bold fs-5"></span>
+                  </div>
+              </div>
+              <div class="col-6">
+                  <label class="small text-muted fw-bold text-uppercase">Foco</label>
+                  <div class="d-flex align-items-center text-dark">
+                      <i class="bi bi-crosshair me-2 text-secondary"></i> 
+                      <span id="m-foco" class="fw-medium"></span>
+                  </div>
+              </div>
+          </div>
+  
+          <div class="mb-2">
+              <label class="small text-muted fw-bold text-uppercase d-block mb-1">Situação</label>
+              <span id="m-status" class="badge rounded-pill px-3 py-2 fs-6"></span>
+          </div>
+
+        </div>
+  
+        <div class="modal-footer border-top-0 pt-0">
+          <button class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">
+              Fechar
+          </button>
+        </div>
+
+      </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/locales-all.global.min.js"></script>
 
-<!-- Eventos do backend -->
 <script id="eventos-dados" type="application/json">
   {{ eventos_json | safe }}
 </script>
 
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-    const eventos = JSON.parse(
-      document.getElementById("eventos-dados").textContent
-    );
+    const eventos = JSON.parse(document.getElementById("eventos-dados").textContent);
 
-    const calendar = new FullCalendar.Calendar(
-      document.getElementById("calendar"),
-      {
+    const calendar = new FullCalendar.Calendar(document.getElementById("calendar"), {
         initialView: "dayGridMonth",
         initialDate: "{{ initial_date }}",
         locale: "pt-br",
-
         height: "auto",
         nowIndicator: true,
         dayMaxEvents: true,
@@ -186,15 +192,6 @@
           list: "Lista",
         },
 
-        allDayText: "Dia inteiro",
-        noEventsText: "Nenhum agendamento para exibir",
-        moreLinkText: function (n) {
-          return `+${n} mais`;
-        },
-
-        weekText: "Sem",
-        dayHeaderFormat: { weekday: "short" },
-
         events: eventos,
 
         eventClick: function (info) {
@@ -207,26 +204,37 @@
 
           const p = info.event.extendedProps || {};
 
+          // Preencher dados do modal
           document.getElementById("m-uvis").innerText = p.uvis || "-";
           document.getElementById("m-foco").innerText = p.foco || "-";
           document.getElementById("m-hora").innerText = p.hora || "-";
-          document.getElementById("m-status").innerText = p.status || "-";
+          
+          // Configurar Badge de Status (Cor e Texto)
+          const statusEl = document.getElementById("m-status");
+          const statusText = p.status || "Indefinido";
+          statusEl.innerText = statusText;
+          
+          // Remove classes anteriores
+          statusEl.className = "badge rounded-pill px-3 py-2 fs-6";
+          
+          // Adiciona cor baseada no status
+          if (statusText === 'APROVADO') statusEl.classList.add('bg-success');
+          else if (statusText === 'NEGADO') statusEl.classList.add('bg-danger');
+          else if (statusText === 'EM ANÁLISE') statusEl.classList.add('bg-warning', 'text-dark');
+          else if (statusText === 'APROVADO COM RECOMENDAÇÕES') statusEl.classList.add('bg-warning', 'text-dark'); 
+          else statusEl.classList.add('bg-secondary'); // Pendente
 
-          const modal = new bootstrap.Modal(
-            document.getElementById("modalEvento")
-          );
+          const modal = new bootstrap.Modal(document.getElementById("modalEvento"));
           modal.show();
         },
 
         eventDidMount: function (info) {
           info.el.setAttribute("title", info.event.title);
-          info.el.style.cursor = info.event.url ? "pointer" : "default";
+          info.el.style.cursor = "pointer";
         },
-      }
-    );
+    });
 
     calendar.render();
   });
 </script>
-
 {% endblock %}

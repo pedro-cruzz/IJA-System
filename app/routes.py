@@ -310,7 +310,7 @@ def exportar_excel():
         return send_file(
             output,
             download_name="relatorio_solicitacoes.xlsx",
-            as_attachment=True,
+            as_attachment=False,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
@@ -2098,7 +2098,7 @@ def baixar_anexo(id):
     return send_from_directory(
         upload_folder,
         rel,
-        as_attachment=True,
+        as_attachment=False,
         download_name=(pedido.anexo_nome or rel)
     )
 
@@ -2470,3 +2470,25 @@ def admin_chatbot():
         "matched": best["title"],
         "confidence": best_score,
     }), 200
+
+
+
+@bp.app_errorhandler(404)
+def pagina_nao_encontrada(e):
+    return render_template(
+        'erro.html', 
+        codigo=404, 
+        titulo="Página não encontrada", 
+        mensagem="Ops! A página que você está procurando não existe ou foi movida."
+    ), 404
+
+@bp.app_errorhandler(500)
+def erro_interno(e):
+    # Opcional: printar o erro no terminal para você ver o que houve
+    # print(f"Erro 500 detectado: {e}")
+    return render_template(
+        'erro.html', 
+        codigo=500, 
+        titulo="Erro Interno do Servidor", 
+        mensagem="Desculpe, algo deu errado do nosso lado. Tente novamente mais tarde."
+    ), 500
