@@ -987,3 +987,23 @@ body.dark-mode {
     color: var(--color-text-main);
   }
 }
+
+/* Botão de anexo minimalista */
+.anexo-btn {
+    display: flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px dashed #ced4da;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    color: #495057;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+    background-color: #f8f9fa;
+}
+
+.transition-all {
+    transition: all 0.25s ease;
+}
+

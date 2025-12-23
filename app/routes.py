@@ -310,7 +310,7 @@ def exportar_excel():
         return send_file(
             output,
             download_name="relatorio_solicitacoes.xlsx",
-            as_attachment=False",
+            as_attachment=False,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
@@ -2101,6 +2101,22 @@ def baixar_anexo(id):
         as_attachment=False,
         download_name=(pedido.anexo_nome or rel)
     )
+
+@bp.route("/admin/solicitacao/<int:id>/remover-anexo", methods=["POST"])
+@login_required
+def remover_anexo(id):
+    pedido = Solicitacao.query.get_or_404(id)
+
+    if current_user.tipo_usuario not in ["admin", "operario"]:
+        abort(403)
+
+    pedido.anexo_path = None
+    pedido.anexo_nome = None
+    db.session.commit()
+    
+
+    return jsonify({"ok": True})
+
 
 
 @bp.route("/admin/uvis/novo", methods=["GET", "POST"], endpoint="admin_uvis_novo")

@@ -14,409 +14,413 @@
     "EM ANÁLISE": "warning",
     "PENDENTE": "info"
 } %}
+<div class="container-fluid py-4" style="max-width: 1200px;">
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="text-dark">
-        <i class="bi bi-bar-chart-fill me-2 text-primary"></i> Relatórios
-    </h2>
+    {# --- Cabeçalho e Bloco de Exportação --- #}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-dark">
+            <i class="bi bi-bar-chart-fill me-2 text-primary"></i> Relatórios
+        </h2>
 
-    {# --- Bloco de Exportação AGORA COM FORMS GET --- #}
-    <div class="d-flex gap-2">
-        
-        {# FORMULÁRIO DE EXPORTAÇÃO PDF (Substitui o Link <a>) #}
-        <form method="GET" action="{{ url_for('main.exportar_relatorio_pdf') }}" class="form-exportar p-0 m-0">
-            <input type="hidden" name="mes" value="{{ mes_selecionado }}">
-            <input type="hidden" name="ano" value="{{ ano_selecionado }}">
-            <input type="hidden" name="uvis_id" value="{{ uvis_id_selecionado }}">
-            <button type="submit" class="btn btn-danger">
-                <i class="bi bi-file-earmark-pdf-fill"></i> Exportar PDF
-            </button>
-        </form>
+        {# --- Bloco de Exportação AGORA COM FORMS GET --- #}
+        <div class="d-flex gap-2">
+            
+            {# FORMULÁRIO DE EXPORTAÇÃO PDF (Substitui o Link <a>) #}
+            <form method="GET" action="{{ url_for('main.exportar_relatorio_pdf') }}" class="form-exportar p-0 m-0">
+                <input type="hidden" name="mes" value="{{ mes_selecionado }}">
+                <input type="hidden" name="ano" value="{{ ano_selecionado }}">
+                <input type="hidden" name="uvis_id" value="{{ uvis_id_selecionado }}">
+                <button type="submit" class="btn btn-danger">
+                    <i class="bi bi-file-earmark-pdf-fill"></i> Exportar PDF
+                </button>
+            </form>
 
-        {# FORMULÁRIO DE EXPORTAÇÃO EXCEL (Substitui o Link <a>) #}
-        <form method="GET" action="{{ url_for('main.exportar_relatorio_excel') }}" class="form-exportar p-0 m-0">
-            <input type="hidden" name="mes" value="{{ mes_selecionado }}">
-            <input type="hidden" name="ano" value="{{ ano_selecionado }}">
-            <input type="hidden" name="uvis_id" value="{{ uvis_id_selecionado }}">
-            <button type="submit" class="btn btn-success">
-                <i class="bi bi-file-earmark-excel-fill"></i> Exportar Excel
-            </button>
-        </form>
-        
-    </div>
-</div>
-
-{# --- Bloco de Filtros Unificado (MANTIDO) --- #}
-<form method="GET" class="card p-3 mb-4 shadow-sm rounded-4">
-    <div class="row g-2 align-items-end">
-        <div class="col-md-3">
-            <label for="mes_select" class="small text-muted">Mês:</label>
-            <select name="mes" id="mes_select" class="form-select form-select-sm">
-                {% for num, nome in meses.items() %}
-                    <option value="{{ num }}" {% if num == mes_selecionado|int %}selected{% endif %}>{{ nome }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="col-md-3">
-            <label for="ano_select" class="small text-muted">Ano:</label>
-            <select name="ano" id="ano_select" class="form-select form-select-sm">
-                {% for ano in anos_disponiveis %}
-                    <option value="{{ ano }}" {% if ano|int == ano_selecionado|int %}selected{% endif %}>{{ ano }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="col-md-3">
-            <label for="uvis_select" class="small text-muted">Unidade (UVIS):</label>
-            <select name="uvis_id" id="uvis_select" class="form-select form-select-sm">
-                <option value="" {% if uvis_id_selecionado is none or uvis_id_selecionado == "" %}selected{% endif %}>Todas as Unidades</option>
-                {% for id, nome in uvis_disponiveis %}
-                    <option value="{{ id }}" {% if id|int == uvis_id_selecionado|int %}selected{% endif %}>{{ nome }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="col-md-3 d-flex gap-2">
-            <button type="submit" class="btn btn-success btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
-
-            {% if uvis_id_selecionado %}
-            <a href="{{ url_for('main.relatorios', mes=mes_selecionado, ano=ano_selecionado) }}"
-               class="btn btn-outline-secondary btn-sm w-100">
-                <i class="bi bi-x-lg"></i> Limpar
-            </a>
-            {% endif %}
+            {# FORMULÁRIO DE EXPORTAÇÃO EXCEL (Substitui o Link <a>) #}
+            <form method="GET" action="{{ url_for('main.exportar_relatorio_excel') }}" class="form-exportar p-0 m-0">
+                <input type="hidden" name="mes" value="{{ mes_selecionado }}">
+                <input type="hidden" name="ano" value="{{ ano_selecionado }}">
+                <input type="hidden" name="uvis_id" value="{{ uvis_id_selecionado }}">
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-file-earmark-excel-fill"></i> Exportar Excel
+                </button>
+            </form>
+            
         </div>
     </div>
-</form>
 
-<h4 class="mb-4 text-primary">
-    Dados de {{ meses[mes_selecionado|int] }} / {{ ano_selecionado }}
-    {% if uvis_id_selecionado %}
-        <small class="text-muted fst-italic">— Filtrado por:
-            {{ uvis_disponiveis | selectattr(0, 'equalto', uvis_id_selecionado|int) | map(attribute=1) | first }}
-        </small>
-    {% endif %}
-</h4>
+    {# --- Bloco de Filtros Unificado (MANTIDO) --- #}
+    <form method="GET" class="card p-3 mb-4 shadow-sm rounded-4">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label for="mes_select" class="small text-muted">Mês:</label>
+                <select name="mes" id="mes_select" class="form-select form-select-sm">
+                    {% for num, nome in meses.items() %}
+                        <option value="{{ num }}" {% if num == mes_selecionado|int %}selected{% endif %}>{{ nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
 
-<div class="row g-2 mb-4">
+            <div class="col-md-3">
+                <label for="ano_select" class="small text-muted">Ano:</label>
+                <select name="ano" id="ano_select" class="form-select form-select-sm">
+                    {% for ano in anos_disponiveis %}
+                        <option value="{{ ano }}" {% if ano|int == ano_selecionado|int %}selected{% endif %}>{{ ano }}</option>
+                    {% endfor %}
+                </select>
+            </div>
 
-  <div class="col-6 col-md-4 col-lg-2">
-    <div class="card info status-primary h-100 shadow-sm rounded-4 overflow-hidden">
-      <div class="card-body">
-        <h6 class="text-uppercase mb-2 text-muted">Total</h6>
-        <h2 class="mb-0 fw-bold text-primary">{{ total_solicitacoes }}</h2>
-      </div>
+            <div class="col-md-3">
+                <label for="uvis_select" class="small text-muted">Unidade (UVIS):</label>
+                <select name="uvis_id" id="uvis_select" class="form-select form-select-sm">
+                    <option value="" {% if uvis_id_selecionado is none or uvis_id_selecionado == "" %}selected{% endif %}>Todas as Unidades</option>
+                    {% for id, nome in uvis_disponiveis %}
+                        <option value="{{ id }}" {% if id|int == uvis_id_selecionado|int %}selected{% endif %}>{{ nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-success btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+
+                {% if uvis_id_selecionado %}
+                <a href="{{ url_for('main.relatorios', mes=mes_selecionado, ano=ano_selecionado) }}"
+                class="btn btn-outline-secondary btn-sm w-100">
+                    <i class="bi bi-x-lg"></i> Limpar
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+
+    <h4 class="mb-4 text-primary">
+        Dados de {{ meses[mes_selecionado|int] }} / {{ ano_selecionado }}
+        {% if uvis_id_selecionado %}
+            <small class="text-muted fst-italic">— Filtrado por:
+                {{ uvis_disponiveis | selectattr(0, 'equalto', uvis_id_selecionado|int) | map(attribute=1) | first }}
+            </small>
+        {% endif %}
+    </h4>
+
+    <div class="row g-2 mb-4">
+
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card info status-primary h-100 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-body">
+            <h6 class="text-uppercase mb-2 text-muted">Total</h6>
+            <h2 class="mb-0 fw-bold text-primary">{{ total_solicitacoes }}</h2>
+        </div>
+        </div>
     </div>
-  </div>
 
-  <div class="col-6 col-md-4 col-lg-2">
-    <div class="card info status-success h-100 shadow-sm rounded-4 overflow-hidden">
-      <div class="card-body">
-        <h6 class="text-uppercase mb-2 text-muted">Aprovadas</h6>
-        <h2 class="mb-0 fw-bold text-success">{{ total_aprovadas }}</h2>
-      </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card info status-success h-100 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-body">
+            <h6 class="text-uppercase mb-2 text-muted">Aprovadas</h6>
+            <h2 class="mb-0 fw-bold text-success">{{ total_aprovadas }}</h2>
+        </div>
+        </div>
     </div>
-  </div>
 
-  <div class="col-6 col-md-4 col-lg-2">
-    <div class="card info status-recomended h-100 shadow-sm rounded-4 overflow-hidden">
-      <div class="card-body">
-        <h6 class="text-uppercase mb-2 text-muted" style="font-size: 0.85rem;">
-          Aprovadas c/ Recom.
-        </h6>
-        <h2 class="mb-0 fw-bold text-recomended">{{ total_aprovadas_com_recomendacoes }}</h2>
-      </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card info status-recomended h-100 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-body">
+            <h6 class="text-uppercase mb-2 text-muted" style="font-size: 0.85rem;">
+            Aprovadas c/ Recom.
+            </h6>
+            <h2 class="mb-0 fw-bold text-recomended">{{ total_aprovadas_com_recomendacoes }}</h2>
+        </div>
+        </div>
     </div>
-  </div>
 
-  <div class="col-6 col-md-4 col-lg-2">
-    <div class="card info status-danger h-100 shadow-sm rounded-4 overflow-hidden">
-      <div class="card-body">
-        <h6 class="text-uppercase mb-2 text-muted">Recusadas</h6>
-        <h2 class="mb-0 fw-bold text-danger">{{ total_recusadas }}</h2>
-      </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card info status-danger h-100 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-body">
+            <h6 class="text-uppercase mb-2 text-muted">Recusadas</h6>
+            <h2 class="mb-0 fw-bold text-danger">{{ total_recusadas }}</h2>
+        </div>
+        </div>
     </div>
-  </div>
 
-  <div class="col-6 col-md-4 col-lg-2">
-    <div class="card info status-warning h-100 shadow-sm rounded-4 overflow-hidden">
-      <div class="card-body">
-        <h6 class="text-uppercase mb-2 text-muted">Em Análise</h6>
-        <h2 class="mb-0 fw-bold text-warning">{{ total_analise }}</h2>
-      </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card info status-warning h-100 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-body">
+            <h6 class="text-uppercase mb-2 text-muted">Em Análise</h6>
+            <h2 class="mb-0 fw-bold text-warning">{{ total_analise }}</h2>
+        </div>
+        </div>
     </div>
-  </div>
 
-  <div class="col-6 col-md-4 col-lg-2">
-    <div class="card info status-info h-100 shadow-sm rounded-4 overflow-hidden">
-      <div class="card-body">
-        <h6 class="text-uppercase mb-2 text-muted">Pendentes</h6>
-        <h2 class="mb-0 fw-bold text-info">{{ total_pendentes }}</h2>
-      </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card info status-info h-100 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-body">
+            <h6 class="text-uppercase mb-2 text-muted">Pendentes</h6>
+            <h2 class="mb-0 fw-bold text-info">{{ total_pendentes }}</h2>
+        </div>
+        </div>
     </div>
-  </div>
 
-</div>
-
-
-{# =========================
-    DASHBOARD DE GRÁFICOS
-    ========================= #}
-<div class="row g-4 mb-4">
-  <div class="col-lg-4">
-    <div class="card shadow-sm rounded-4 p-4 h-100">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="mb-0 text-dark"><i class="bi bi-pie-chart-fill me-2"></i>Status</h5>
-        <span class="badge bg-light text-dark ">Período filtrado</span>
-      </div>
-      <div style="height:280px;">
-        <canvas id="chartStatus"></canvas>
-      </div>
     </div>
-  </div>
 
-  <div class="col-lg-8">
-    <div class="card shadow-sm rounded-4 p-4 h-100">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="mb-0 text-dark"><i class="bi bi-geo-alt-fill me-2"></i>Solicitações por Região</h5>
-        <span class="badge bg-light text-dark">Período filtrado</span>
-      </div>
-      <div style="height:280px;">
-        <canvas id="chartRegiao"></canvas>
-      </div>
-    </div>
-  </div>
-</div>
 
-<div class="row g-4 mb-4">
-  <div class="col-lg-6">
-    <div class="card shadow-sm rounded-4 p-4 h-100">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="mb-0 text-dark"><i class="bi bi-building-check me-2"></i>Unidades (UVIS)</h5>
-        <span class="badge bg-light text-dark ">Top 10</span>
-      </div>
-      <div style="height:320px;">
-        <canvas id="chartUnidade"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-lg-6">
-    <div class="card shadow-sm rounded-4 p-4 h-100">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="mb-0 text-dark"><i class="bi bi-bullseye me-2"></i>Foco</h5>
-        <span class="badge bg-light text-dark ">Período filtrado</span>
-      </div>
-      <div style="height:320px;">
-        <canvas id="chartFoco"></canvas>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="row g-4 mb-4">
-  <div class="col-lg-6">
-    <div class="card shadow-sm rounded-4 p-4 h-100">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="mb-0 text-dark"><i class="bi bi-journal-text me-2"></i>Tipo de Visita</h5>
-        <span class="badge bg-light text-dark ">Período filtrado</span>
-      </div>
-      <div style="height:320px;">
-        <canvas id="chartTipoVisita"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-lg-6">
-    <div class="card shadow-sm rounded-4 p-4 h-100">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="mb-0 text-dark"><i class="bi bi-ruler me-2"></i>Altura de Voo</h5>
-        <span class="badge bg-light text-dark ">Período filtrado</span>
-      </div>
-      <div style="height:320px;">
-        <canvas id="chartAltura"></canvas>
-      </div>
-    </div>
-  </div>
-</div>
-
-{# --- Tabelas detalhadas: Região, Unidade, Status, Foco, Tipo, Altura --- #}
-<div class="card shadow-sm rounded-4 p-4 mb-4">
-    <h4 class="mb-3 text-dark"><i class="bi bi-geo-alt-fill me-2"></i>Solicitações por Região</h4>
-    <div class="table-responsive">
-        <table class="table table-hover align-middle">
-            <thead>
-                <tr>
-                    <th>Região</th>
-                    <th class="text-center">Total de Solicitações</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for regiao, count in dados_regiao %}
-                <tr>
-                    <td>{{ regiao or 'Não informado' }}</td>
-                    <td class="text-center">{{ count }}</td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="2" class="text-center text-muted">Nenhuma solicitação encontrada para este período.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<div class="card shadow-sm rounded-4 p-4 mb-4">
-    <h4 class="mb-3 text-dark"><i class="bi bi-building-check me-2"></i>Solicitações por Unidade (UVIS)</h4>
-    <div class="table-responsive">
-        <table class="table table-hover align-middle">
-            <thead>
-                <tr>
-                    <th>Unidade (UVIS)</th>
-                    <th class="text-center">Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for unidade, total in dados_unidade %}
-                <tr>
-                    <td>{{ unidade or 'Não informado' }}</td>
-                    <td class="text-center">{{ total }}</td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="2" class="text-center text-muted">Nenhuma solicitação encontrada para as unidades do período selecionado.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<div class="row g-4 mb-4">
-    <div class="col-md-6">
+    {# =========================
+        DASHBOARD DE GRÁFICOS
+        ========================= #}
+    <div class="row g-4 mb-4">
+    <div class="col-lg-4">
         <div class="card shadow-sm rounded-4 p-4 h-100">
-            <h4 class="mb-3 text-dark"><i class="bi bi-list-task me-2"></i>Status Detalhado</h4>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Status</th>
-                            <th class="text-center">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for status, count in dados_status %}
-                        <tr>
-                            <td><span class="badge bg-{{ status_cores.get(status, 'secondary') }} text-uppercase">{{ status }}</span></td>
-                            <td class="text-center">{{ count }}</td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="2" class="text-center text-muted">Nenhum status encontrado.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0 text-dark"><i class="bi bi-pie-chart-fill me-2"></i>Status</h5>
+            <span class="badge bg-light text-dark ">Período filtrado</span>
+        </div>
+        <div style="height:280px;">
+            <canvas id="chartStatus"></canvas>
+        </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card shadow-sm rounded-4 p-4 h-100">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0 text-dark"><i class="bi bi-geo-alt-fill me-2"></i>Solicitações por Região</h5>
+            <span class="badge bg-light text-dark">Período filtrado</span>
+        </div>
+        <div style="height:280px;">
+            <canvas id="chartRegiao"></canvas>
+        </div>
+        </div>
+    </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="card shadow-sm rounded-4 p-4 h-100">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0 text-dark"><i class="bi bi-building-check me-2"></i>Unidades (UVIS)</h5>
+            <span class="badge bg-light text-dark ">Top 10</span>
+        </div>
+        <div style="height:320px;">
+            <canvas id="chartUnidade"></canvas>
+        </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card shadow-sm rounded-4 p-4 h-100">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0 text-dark"><i class="bi bi-bullseye me-2"></i>Foco</h5>
+            <span class="badge bg-light text-dark ">Período filtrado</span>
+        </div>
+        <div style="height:320px;">
+            <canvas id="chartFoco"></canvas>
+        </div>
+        </div>
+    </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="card shadow-sm rounded-4 p-4 h-100">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0 text-dark"><i class="bi bi-journal-text me-2"></i>Tipo de Visita</h5>
+            <span class="badge bg-light text-dark ">Período filtrado</span>
+        </div>
+        <div style="height:320px;">
+            <canvas id="chartTipoVisita"></canvas>
+        </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card shadow-sm rounded-4 p-4 h-100">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0 text-dark"><i class="bi bi-ruler me-2"></i>Altura de Voo</h5>
+            <span class="badge bg-light text-dark ">Período filtrado</span>
+        </div>
+        <div style="height:320px;">
+            <canvas id="chartAltura"></canvas>
+        </div>
+        </div>
+    </div>
+    </div>
+
+    {# --- Tabelas detalhadas: Região, Unidade, Status, Foco, Tipo, Altura --- #}
+    <div class="card shadow-sm rounded-4 p-4 mb-4">
+        <h4 class="mb-3 text-dark"><i class="bi bi-geo-alt-fill me-2"></i>Solicitações por Região</h4>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Região</th>
+                        <th class="text-center">Total de Solicitações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for regiao, count in dados_regiao %}
+                    <tr>
+                        <td>{{ regiao or 'Não informado' }}</td>
+                        <td class="text-center">{{ count }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="2" class="text-center text-muted">Nenhuma solicitação encontrada para este período.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card shadow-sm rounded-4 p-4 mb-4">
+        <h4 class="mb-3 text-dark"><i class="bi bi-building-check me-2"></i>Solicitações por Unidade (UVIS)</h4>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Unidade (UVIS)</th>
+                        <th class="text-center">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for unidade, total in dados_unidade %}
+                    <tr>
+                        <td>{{ unidade or 'Não informado' }}</td>
+                        <td class="text-center">{{ total }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="2" class="text-center text-muted">Nenhuma solicitação encontrada para as unidades do período selecionado.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm rounded-4 p-4 h-100">
+                <h4 class="mb-3 text-dark"><i class="bi bi-list-task me-2"></i>Status Detalhado</h4>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th class="text-center">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for status, count in dados_status %}
+                            <tr>
+                                <td><span class="badge bg-{{ status_cores.get(status, 'secondary') }} text-uppercase">{{ status }}</span></td>
+                                <td class="text-center">{{ count }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="2" class="text-center text-muted">Nenhum status encontrado.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm rounded-4 p-4 h-100">
+                <h4 class="mb-3 text-dark"><i class="bi bi-bullseye me-2"></i>Solicitações por Foco</h4>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Foco</th>
+                                <th class="text-center">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for foco, count in dados_foco %}
+                            <tr>
+                                <td>{{ foco or 'Não informado' }}</td>
+                                <td class="text-center">{{ count }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="2" class="text-center text-muted">Nenhuma solicitação encontrada por foco.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="col-md-6">
-        <div class="card shadow-sm rounded-4 p-4 h-100">
-            <h4 class="mb-3 text-dark"><i class="bi bi-bullseye me-2"></i>Solicitações por Foco</h4>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Foco</th>
-                            <th class="text-center">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for foco, count in dados_foco %}
-                        <tr>
-                            <td>{{ foco or 'Não informado' }}</td>
-                            <td class="text-center">{{ count }}</td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="2" class="text-center text-muted">Nenhuma solicitação encontrada por foco.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm rounded-4 p-4 h-100">
+                <h4 class="mb-3 text-dark"><i class="bi bi-journal-text me-2"></i>Solicitações por Tipo de Visita</h4>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Tipo de Visita</th>
+                                <th class="text-center">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tipo, count in dados_tipo_visita %}
+                            <tr>
+                                <td>{{ tipo | capitalize or 'Não informado' }}</td>
+                                <td class="text-center">{{ count }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="2" class="text-center text-muted">Nenhuma solicitação encontrada por tipo de visita.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm rounded-4 p-4 h-100">
+                <h4 class="mb-3 text-dark"><i class="bi bi-ruler me-2"></i>Solicitações por Altura de Voo</h4>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Altura (Metros)</th>
+                                <th class="text-center">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for altura, count in dados_altura_voo %}
+                            <tr>
+                                <td>{{ altura or 'Não informado' }}</td>
+                                <td class="text-center">{{ count }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="2" class="text-center text-muted">Nenhuma solicitação encontrada por altura de voo.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<div class="row g-4 mb-4">
-    <div class="col-md-6">
-        <div class="card shadow-sm rounded-4 p-4 h-100">
-            <h4 class="mb-3 text-dark"><i class="bi bi-journal-text me-2"></i>Solicitações por Tipo de Visita</h4>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Tipo de Visita</th>
-                            <th class="text-center">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for tipo, count in dados_tipo_visita %}
-                        <tr>
-                            <td>{{ tipo | capitalize or 'Não informado' }}</td>
-                            <td class="text-center">{{ count }}</td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="2" class="text-center text-muted">Nenhuma solicitação encontrada por tipo de visita.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+    {# Histórico mensal (seu gráfico original, mantido) #}
+    <div class="card shadow-sm rounded-4 p-4 mb-4">
+        <h4 class="mb-3 text-dark"><i class="bi bi-graph-up me-2"></i>Solicitações por Mês (Histórico)</h4>
+        <p class="text-muted mb-3">Visão geral da evolução ao longo do tempo, independente do filtro de período.</p>
+        <div style="height:300px;">
+            <canvas id="chartMensal"></canvas>
         </div>
     </div>
 
-    <div class="col-md-6">
-        <div class="card shadow-sm rounded-4 p-4 h-100">
-            <h4 class="mb-3 text-dark"><i class="bi bi-ruler me-2"></i>Solicitações por Altura de Voo</h4>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Altura (Metros)</th>
-                            <th class="text-center">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for altura, count in dados_altura_voo %}
-                        <tr>
-                            <td>{{ altura or 'Não informado' }}</td>
-                            <td class="text-center">{{ count }}</td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="2" class="text-center text-muted">Nenhuma solicitação encontrada por altura de voo.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
-
-{# Histórico mensal (seu gráfico original, mantido) #}
-<div class="card shadow-sm rounded-4 p-4 mb-4">
-    <h4 class="mb-3 text-dark"><i class="bi bi-graph-up me-2"></i>Solicitações por Mês (Histórico)</h4>
-    <p class="text-muted mb-3">Visão geral da evolução ao longo do tempo, independente do filtro de período.</p>
-    <div style="height:300px;">
-        <canvas id="chartMensal"></canvas>
-    </div>
 </div>
 
 {# =========================

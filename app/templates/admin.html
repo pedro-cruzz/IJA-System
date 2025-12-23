@@ -30,7 +30,10 @@
 
             <div class="col-md-3">
                 <label class="small text-muted">Status:</label>
-                <select name="status" class="form-select form-select-sm">
+                <select 
+                    name="status" 
+                    class="form-select form-select-sm mb-2"
+                >
                     <option value="">Todos</option>
                     <option value="PENDENTE" {{ 'selected' if request.args.get('status')=='PENDENTE' else '' }}>⚪️
                         Pendente</option>
@@ -136,10 +139,10 @@
                             <div class="d-flex justify-content-between align-items-center p-2 rounded mb-3 border">
                                 <div style="line-height: 1.2;">
                                     <small class="text-muted d-block">GPS:</small>
-                                    <small class="fw-bold font-monospace">{{ p.latitude }}, {{ p.longitude }}</small>
+                                    <small class="fw-bold font-monospace ">{{ p.latitude }}, {{ p.longitude }}</small>
                                 </div>
                                 <a href="http://maps.google.com/maps?q={{ p.latitude }},{{ p.longitude }}"
-                                    target="_blank" class="btn btn-sm btn-outline-danger">
+                                    target="_blank" class="btn btn-sm btn-outline-danger ms-2">
                                     <i class="bi bi-map-fill"></i> Mapa
                                 </a>
                             </div>
@@ -185,7 +188,11 @@
                             {# FORMULÁRIO DE ATUALIZAÇÃO (Será pego pelo listener universal do BASE.HTML) #}
                             {% if is_editable %}
                             
-                            <form action="{{ url_for('main.salvar_decisao', id=p.id) }}" method="POST" enctype="multipart/form-data">
+                            <form
+                                action="{{ url_for('main.atualizar', id=p.id) }}"
+                                method="POST"
+                                enctype="multipart/form-data"
+                            >
                                 
                                 <div class="row g-1 mb-2">
                                     <div class="col-12"><label class="small fw-bold text-muted">Ajuste GPS (Lat / Long)</label></div>
@@ -205,7 +212,11 @@
 
                                 <div class="p-2 border rounded">
                                     <label class="small fw-bold text-muted">Status</label>
-                                    <select name="status" class="form-select form-select-sm mb-2">
+                                    <select 
+                                        name="status" 
+                                        class="form-select form-select-sm mb-2"
+                                        onchange="toggleJustificativa(this, '{{ p.id }}')"
+                                    >
                                         <option value="PENDENTE" {% if p.status=='PENDENTE' %}selected{% endif %}>⚪️
                                             Pendente</option>
                                         <option value="EM ANÁLISE" {% if p.status=='EM ANÁLISE' %}selected{% endif %}>🟡
@@ -217,54 +228,77 @@
                                         </option>
                                     </select>
 
-                                    <div class="mb-3">
-                                        <label class="small fw-bold text-muted mb-1">Justificativa (se negar)</label>
-                                        <input name="justificativa" class="form-control form-control-sm" value="{{ p.justificativa or '' }}" placeholder="Digite a justificativa..." title="Justificativa para a decisão">
+                                    <div
+                                        class="mb-3"
+                                        id="boxJustificativa{{ p.id }}"
+                                        style="display: none;"
+                                    >
+                                        <label class="small fw-bold text-muted mb-1">
+                                            Justificativa (obrigatória se negar)
+                                        </label>
+
+                                        <input
+                                            name="justificativa"
+                                            id="inputJustificativa{{ p.id }}"
+                                            class="form-control form-control-sm"
+                                            value="{{ p.justificativa or '' }}"
+                                            placeholder="Digite a justificativa..."
+                                        >
                                     </div>
+
 
                                     <div class="mb-3">
                                         <label class="small fw-bold text-muted mb-1">Anexo (PDF)</label>
 
                                         <div class="d-flex align-items-center gap-2">
-                                            
-                                            <label for="inputPdf{{ p.id }}" 
-                                                class="form-control form-control-sm d-flex align-items-center cursor-pointer text-muted bg-light border-secondary border-opacity-25 text-truncate flex-grow-1" 
-                                                style="cursor: pointer;">
-                                                
+
+                                            <label for="inputPdf{{ p.id }}" class="btn btn-sm btn-outline-primary">
                                                 <span id="textoDisplay{{ p.id }}" class="text-truncate">
                                                     <i class="bi bi-paperclip me-2"></i>
-                                                    {% if p.anexo_path %}
-                                                        Substituir arquivo atual
-                                                    {% else %}
-                                                        Clique para anexar PDF
-                                                    {% endif %}
+                                                    {{ p.anexo_nome or 'Anexar arquivo' }}
                                                 </span>
                                             </label>
 
-                                            <a id="btnVisualizar{{ p.id }}" href="#" target="_blank" class="btn btn-sm btn-outline-primary d-none" title="Conferir PDF selecionado">
+                                            <a
+                                                id="btnVisualizar{{ p.id }}"
+                                                href="{{ url_for('main.baixar_anexo', id=p.id) if p.anexo_path else '#' }}"
+                                                target="_blank"
+                                                class="btn btn-sm btn-outline-primary {% if not p.anexo_path %}d-none{% endif %}"
+                                            >
                                                 <i class="bi bi-eye"></i>
                                             </a>
 
-                                            <button id="btnRemover{{ p.id }}" type="button" class="btn btn-sm btn-outline-danger d-none" onclick="removerArquivo('{{ p.id }}')" title="Remover seleção">
-                                                <i class="bi bi-x-lg"></i>
+                                            <button
+                                                id="btnRemover{{ p.id }}"
+                                                type="button"
+                                                class="btn btn-sm btn-outline-danger {% if not p.anexo_path %}d-none{% endif %}"
+                                                onclick="removerPdf('{{ p.id }}')"
+                                            >
+                                                <i class="bi bi-x"></i>
                                             </button>
 
-                                            <input type="file" name="anexo" id="inputPdf{{ p.id }}" class="d-none" accept="application/pdf" onchange="processarArquivo(this, '{{ p.id }}')">
+                                            <input
+                                                type="file"
+                                                name="anexo"
+                                                id="inputPdf{{ p.id }}"
+                                                class="d-none"
+                                            accept="
+                                                application/pdf,
+                                                image/png,
+                                                image/jpeg,
+                                                application/msword,
+                                                application/vnd.openxmlformats-officedocument.wordprocessingml.document,
+                                                application/vnd.ms-excel,
+                                                application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                                onchange="processarArquivo(this, '{{ p.id }}')"
+                                            >
                                         </div>
-
-                                        {% if p.anexo_path %}
-                                        <div class="mt-2 text-end" id="linkSalvo{{ p.id }}">
-                                            <a href="{{ url_for('main.baixar_anexo', id=p.id) }}" target="_blank" class="text-decoration-none small fw-bold text-success border border-success rounded-pill px-2 py-1 bg-success bg-opacity-10">
-                                                <i class="bi bi-check-circle-fill me-1"></i>Ver arquivo salvo: {{ p.anexo_nome or 'Anexo.pdf' }}
-                                            </a>
-                                        </div>
-                                        {% endif %}
                                     </div>
-                                </div>
+
 
                                 <div class="d-grid mt-2">
                                     <button type="submit" class="btn btn-primary btn-sm rounded-pill shadow-sm" id="btnSalvar{{ p.id }}">
-                                        <i class="bi bi-save me-1"></i>Salvar Decisão
+                                        <i class="bi bi-check-lg me-1"></i>Salvar Decisão
                                     </button>
                                 </div>
 
@@ -276,8 +310,13 @@
                             <div class="p-3 border rounded">
                                 <label class="small fw-bold text-muted">Status Atual:</label>
                                 <div class="text-center mb-3">
-                                    <span class="badge 
-                                        {% if p.status=='PENDENTE' %}bg-secondary{% elif p.status=='EM ANÁLISE' %}bg-warning{% elif p.status=='APROVADO' %}{% elif p.status=='EM ANÁLISE' %}bg-recomended{% elif p.status=='NEGADO' %}bg-danger{% endif %} 
+                                    <span class="badge
+                                        {% if p.status=='PENDENTE' %}bg-secondary
+                                        {% elif p.status=='EM ANÁLISE' %}bg-warning
+                                        {% elif p.status=='APROVADO' %}bg-success
+                                        {% elif p.status=='APROVADO COM RECOMENDAÇÕES' %}bg-info
+                                        {% elif p.status=='NEGADO' %}bg-danger
+                                        {% endif %}
                                         fs-6 p-2">
                                         {{ p.status }}
                                     </span>
@@ -591,61 +630,101 @@
         });
     });
 
-    // =========================================
-    // 3. Lógica de Anexo e Envio AJAX (SALVAR)
-    // =========================================
     
+    // =========================================
+    // 3. Lógica de remover Anexo PDF
+    // =========================================
+
+    // URL gerada pelo Flask (id dummy = 0)
+    const URL_REMOVER_ANEXO = "{{ url_for('main.remover_anexo', id=0) }}";
+    
+    
+    function removerPdf(id) {
+
+    // Checagem do Dark Mode (do base.html)
+    const isDarkMode = document.body.classList.contains('dark-mode');
+
+    Swal.fire({
+        title: 'Tem certeza?',
+        text: 'Você está prestes a REMOVER PERMANENTEMENTE o PDF anexado.',
+        icon: 'warning',
+
+        // Dark Mode igual ao delete
+        customClass: {
+            popup: isDarkMode ? 'swal2-dark-mode' : '',
+        },
+
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Sim, remover!',
+        cancelButtonText: 'Cancelar'
+
+    }).then((result) => {
+
+        if (!result.isConfirmed) return;
+
+        const url = URL_REMOVER_ANEXO.replace('/0', '/' + id);
+
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erro ao remover anexo');
+            }
+            location.reload();
+        })
+        .catch(() => {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: 'Não foi possível remover o PDF.',
+                customClass: {
+                    popup: isDarkMode ? 'swal2-dark-mode' : '',
+                }
+            });
+        });
+
+    });
+}
+    // =========================================
+    // 4. Lógica de Anexo e Envio AJAX (SALVAR)
+    // =========================================
+
     // --- Lógica Visual (Preview e Remover) ---
     function processarArquivo(input, id) {
-        const display = document.getElementById('textoDisplay' + id);
-        const btnVisualizar = document.getElementById('btnVisualizar' + id);
-        const btnRemover = document.getElementById('btnRemover' + id);
-        const linkSalvo = document.getElementById('linkSalvo' + id);
-        
-        if (input.files && input.files[0]) {
-            const arquivo = input.files[0];
-            const urlArquivo = URL.createObjectURL(arquivo);
+    if (!input.files.length) return;
 
-            // Atualiza visual
-            display.innerHTML = `<i class="bi bi-file-earmark-pdf-fill text-danger me-2"></i><span class="text-dark fw-bold">${arquivo.name}</span>`;
-            display.parentElement.classList.remove('text-muted', 'bg-light');
-            display.parentElement.classList.add('bg-white', 'border-primary');
+    const file = input.files[0];
 
-            // Mostra botões
-            btnVisualizar.href = urlArquivo;
-            btnVisualizar.classList.remove('d-none');
-            btnRemover.classList.remove('d-none');
+    const texto = document.getElementById('textoDisplay' + id);
+    const btnAnexo = document.getElementById('btnAnexo' + id);
+    const btnVisualizar = document.getElementById('btnVisualizar' + id);
+    const btnRemover = document.getElementById('btnRemover' + id);
 
-            // Opcional: Esconde o link do arquivo antigo para não confundir
-            if(linkSalvo) linkSalvo.style.display = 'none';
-        }
-    }
+    const url = URL.createObjectURL(file);
 
-    function removerArquivo(id) {
-        const input = document.getElementById('inputPdf' + id);
-        const display = document.getElementById('textoDisplay' + id);
-        const btnVisualizar = document.getElementById('btnVisualizar' + id);
-        const btnRemover = document.getElementById('btnRemover' + id);
-        const linkSalvo = document.getElementById('linkSalvo' + id);
+    // Texto do botão
+    texto.textContent = file.name;
 
-        input.value = ''; // Reseta input
+    // Botão anexo deixa de ocupar 100%
+    btnAnexo.classList.remove('w-100');
+    btnAnexo.classList.add('flex-grow-1');
 
-        // Reseta visual
-        display.innerHTML = `<i class="bi bi-paperclip me-2"></i>Clique para anexar PDF`;
-        display.parentElement.classList.add('text-muted', 'bg-light');
-        display.parentElement.classList.remove('bg-white', 'border-primary');
+    // Ativa botões laterais
+    btnVisualizar.href = url;
+    btnVisualizar.classList.remove('d-none');
+    btnRemover.classList.remove('d-none');
+}
 
-        // Esconde botões
-        btnVisualizar.classList.add('d-none');
-        btnRemover.classList.add('d-none');
 
-        // Se existia um link de salvo antes, mostra de volta
-        if(linkSalvo) linkSalvo.style.display = 'block';
-    }
-
-    // --- Lógica de Envio AJAX (Genérico) ---
+    // --- Lógica de Envio AJAX  --- //
     document.addEventListener("DOMContentLoaded", function() {
-        const forms = document.querySelectorAll('form');
+        const forms = document.querySelectorAll('form[enctype="multipart/form-data"]');
 
         forms.forEach(form => {
             form.addEventListener('submit', async function(e) {
@@ -686,6 +765,40 @@
             });
         });
     });
+
+    // =========================================
+    // 5. Lógica para esconder e mostrar justificativa (mostra só quando negado)
+    // =========================================
+
+    function toggleJustificativa(select, id) {
+        const box = document.getElementById('boxJustificativa' + id);
+        const input = document.getElementById('inputJustificativa' + id);
+
+        if (!box || !input) return;
+
+        if (select.value === 'NEGADO') {
+            box.style.display = 'block';
+            input.setAttribute('required', 'required');
+            input.focus();
+        } else {
+            box.style.display = 'none';
+            input.removeAttribute('required');
+            input.value = '';
+        }
+    }
+
+    // ✅ Executa automaticamente ao carregar a página
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('select[name="status"]').forEach(select => {
+            const form = select.closest('form');
+            if (!form) return;
+
+            const id = form.action.split('/').pop();
+            toggleJustificativa(select, id);
+        });
+    });
+
+
 
 </script>
 {% endblock %}
