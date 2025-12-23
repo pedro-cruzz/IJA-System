@@ -252,7 +252,7 @@
 
                                         <div class="d-flex align-items-center gap-2">
 
-                                            <label for="inputPdf{{ p.id }}" class="btn btn-sm btn-outline-primary">
+                                            <label id="btnAnexo{{ p.id }}" for="inputPdf{{ p.id }}" class="btn btn-sm btn-outline-primary w-100">
                                                 <span id="textoDisplay{{ p.id }}" class="text-truncate">
                                                     <i class="bi bi-paperclip me-2"></i>
                                                     {{ p.anexo_nome or 'Anexar arquivo' }}
@@ -639,7 +639,7 @@
     const URL_REMOVER_ANEXO = "{{ url_for('main.remover_anexo', id=0) }}";
     
     
-    function removerPdf(id) {
+function removerPdf(id) {
 
     // Checagem do Dark Mode (do base.html)
     const isDarkMode = document.body.classList.contains('dark-mode');
@@ -649,7 +649,6 @@
         text: 'Você está prestes a REMOVER PERMANENTEMENTE o PDF anexado.',
         icon: 'warning',
 
-        // Dark Mode igual ao delete
         customClass: {
             popup: isDarkMode ? 'swal2-dark-mode' : '',
         },
@@ -658,46 +657,62 @@
         confirmButtonColor: '#d33',
         cancelButtonColor: '#6c757d',
         confirmButtonText: 'Sim, remover!',
-        cancelButtonText: 'Cancelar'
+        cancelButtonText: 'Cancelar',
+
+        showLoaderOnConfirm: true,
+        preConfirm: () => {
+            const url = URL_REMOVER_ANEXO.replace('/0', '/' + id);
+
+            return fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            }).then(response => {
+                if (!response.ok) {
+                    throw new Error('Erro ao remover anexo');
+                }
+            });
+        },
+
+        allowOutsideClick: () => !Swal.isLoading()
 
     }).then((result) => {
 
-        if (!result.isConfirmed) return;
-
-        const url = URL_REMOVER_ANEXO.replace('/0', '/' + id);
-
-        fetch(url, {
-            method: 'POST',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Erro ao remover anexo');
-            }
-            location.reload();
-        })
-        .catch(() => {
+        if (result.isConfirmed) {
             Swal.fire({
-                icon: 'error',
-                title: 'Erro',
-                text: 'Não foi possível remover o PDF.',
+                icon: 'success',
+                title: 'Removido!',
+                text: 'O PDF foi removido com sucesso.',
+                timer: 1200,
+                showConfirmButton: false,
                 customClass: {
                     popup: isDarkMode ? 'swal2-dark-mode' : '',
                 }
+            }).then(() => {
+                location.reload();
             });
-        });
+        }
 
+    }).catch(() => {
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro',
+            text: 'Não foi possível remover o PDF.',
+            customClass: {
+                popup: isDarkMode ? 'swal2-dark-mode' : '',
+            }
+        });
     });
 }
+
     // =========================================
     // 4. Lógica de Anexo e Envio AJAX (SALVAR)
     // =========================================
 
     // --- Lógica Visual (Preview e Remover) ---
-    function processarArquivo(input, id) {
-    if (!input.files.length) return;
+function processarArquivo(input, id) {
+    if (!input.files || !input.files.length) return;
 
     const file = input.files[0];
 
@@ -708,18 +723,22 @@
 
     const url = URL.createObjectURL(file);
 
-    // Texto do botão
-    texto.textContent = file.name;
+    // Atualiza texto
+    texto.innerHTML = `
+        <i class="bi bi-paperclip me-2"></i>
+        ${file.name}
+    `;
 
-    // Botão anexo deixa de ocupar 100%
+    // 🔑 TROCA DE LAYOUT (ESSENCIAL)
     btnAnexo.classList.remove('w-100');
     btnAnexo.classList.add('flex-grow-1');
 
-    // Ativa botões laterais
+    // Mostra botões
     btnVisualizar.href = url;
     btnVisualizar.classList.remove('d-none');
     btnRemover.classList.remove('d-none');
 }
+
 
 
     // --- Lógica de Envio AJAX  --- //
