@@ -10,18 +10,19 @@ class Usuario(UserMixin, db.Model):
     __tablename__ = 'usuarios'
 
     id = db.Column(db.Integer, primary_key=True)
-    nome_uvis = db.Column(db.String(100), nullable=False)
-    regiao = db.Column(db.String(50))
+
+    nome_uvis = db.Column(db.String(100), nullable=False, index=True)
+    regiao = db.Column(db.String(50), index=True)
     codigo_setor = db.Column(db.String(10))
 
-    login = db.Column(db.String(50), unique=True, nullable=False)
+    login = db.Column(db.String(50), unique=True, nullable=False, index=True)
     senha_hash = db.Column(db.String(200), nullable=False)
 
-    tipo_usuario = db.Column(db.String(20), default='uvis')
+    tipo_usuario = db.Column(db.String(20), default='uvis', index=True)
 
     solicitacoes = db.relationship(
         "Solicitacao",
-        back_populates="usuario", 
+        back_populates="usuario",
         lazy="select"
     )
 
@@ -38,24 +39,25 @@ class Usuario(UserMixin, db.Model):
 class Solicitacao(db.Model):
     __tablename__ = 'solicitacoes'
 
-    id = db.Column(db.Integer, primary_key=True, )
+    id = db.Column(db.Integer, primary_key=True)
 
     # ----------------------
     # Dados Básicos e Data
     # ----------------------
-    data_agendamento = db.Column(db.Date, nullable=False)
+    data_agendamento = db.Column(db.Date, nullable=False, index=True)
     hora_agendamento = db.Column(db.Time, nullable=False)
-    foco = db.Column(db.String(50), nullable=False)
+
+    foco = db.Column(db.String(50), nullable=False, index=True)
 
     # ----------------------
     # Detalhes Operacionais
     # ----------------------
-    tipo_visita = db.Column(db.String(50))
-    altura_voo = db.Column(db.String(20))
-    
-    criadouro = db.Column(db.Boolean, default=False) 
+    tipo_visita = db.Column(db.String(50), index=True)
+    altura_voo = db.Column(db.String(20), index=True)
+
+    criadouro = db.Column(db.Boolean, default=False)
     apoio_cet = db.Column(db.Boolean, default=False)
-    
+
     observacao = db.Column(db.Text)
 
     # ----------------------
@@ -63,13 +65,14 @@ class Solicitacao(db.Model):
     # ----------------------
     cep = db.Column(db.String(9), nullable=False)
     logradouro = db.Column(db.String(150), nullable=False)
-    bairro = db.Column(db.String(100), nullable=False)
-    cidade = db.Column(db.String(100), nullable=False)
-    uf = db.Column(db.String(2), nullable=False)
+    bairro = db.Column(db.String(100), nullable=False, index=True)
+    cidade = db.Column(db.String(100), nullable=False, index=True)
+    uf = db.Column(db.String(2), nullable=False, index=True)
+
     numero = db.Column(db.String(20))
     complemento = db.Column(db.String(100))
 
-    # Gealocalização
+    # Geolocalização
     latitude = db.Column(db.String(50))
     longitude = db.Column(db.String(50))
 
@@ -80,43 +83,100 @@ class Solicitacao(db.Model):
     # ----------------------
     # Controle Admin
     # ----------------------
-    protocolo = db.Column(db.String(50))
+    protocolo = db.Column(db.String(50), index=True)
     justificativa = db.Column(db.String(255))
-    data_criacao = db.Column(db.DateTime, default=datetime.utcnow,index=True)
-    status = db.Column(db.String(30), default="EM ANÁLISE", index=True)
+
+    data_criacao = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        index=True
+    )
+
+    status = db.Column(
+        db.String(30),
+        default="EM ANÁLISE",
+        index=True
+    )
 
     usuario_id = db.Column(
         db.Integer,
         db.ForeignKey("usuarios.id"),
         nullable=False,
-        index = True
+        index=True
     )
 
-    usuario = db.relationship("Usuario", back_populates="solicitacoes")
-    
-    
+    usuario = db.relationship(
+        "Usuario",
+        back_populates="solicitacoes"
+    )
+
+    # 🔥 ÍNDICES COMPOSTOS (MUITO IMPORTANTES PARA RELATÓRIOS)
+    __table_args__ = (
+        db.Index(
+            "ix_solicitacao_data_status",
+            "data_criacao",
+            "status"
+        ),
+        db.Index(
+            "ix_solicitacao_usuario_data",
+            "usuario_id",
+            "data_criacao"
+        ),
+    )
+
+
+# -------------------------------------------------------------
+# NOTIFICAÇÕES
+# -------------------------------------------------------------
 class Notificacao(db.Model):
     __tablename__ = "notificacoes"
 
     id = db.Column(db.Integer, primary_key=True)
-    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
+
+    usuario_id = db.Column(
+        db.Integer,
+        db.ForeignKey("usuarios.id"),
+        nullable=False,
+        index=True
+    )
 
     titulo = db.Column(db.String(140), nullable=False)
     mensagem = db.Column(db.Text)
     link = db.Column(db.String(255))
 
-    criada_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    lida_em = db.Column(db.DateTime)
+    criada_em = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+        index=True
+    )
 
-    apagada_em = db.Column(db.DateTime)
+    lida_em = db.Column(db.DateTime, index=True)
+    apagada_em = db.Column(db.DateTime, index=True)
 
+
+# -------------------------------------------------------------
+# CLIENTES
+# -------------------------------------------------------------
 class Clientes(db.Model):
     __tablename__ = "clientes"
 
     id = db.Column(db.Integer, primary_key=True, index=True)
-    nome_cliente = db.Column(db.String(100), nullable=False, index=True)
-    documento = db.Column(db.String(50), unique=True, nullable=False)
+
+    nome_cliente = db.Column(
+        db.String(100),
+        nullable=False,
+        index=True
+    )
+
+    documento = db.Column(
+        db.String(50),
+        unique=True,
+        nullable=False,
+        index=True
+    )
+
     contato = db.Column(db.String(100))
     telefone = db.Column(db.String(20))
-    email = db.Column(db.String(100))
+    email = db.Column(db.String(100), index=True)
     endereco = db.Column(db.String(255))

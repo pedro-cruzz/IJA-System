@@ -567,7 +567,6 @@ from flask import redirect, render_template, request, session, url_for
 from app import db
 from app.models import Solicitacao, Usuario
 
-
 @bp.route('/relatorios', methods=['GET'])
 def relatorios():
     if not current_user.is_authenticated:
@@ -580,12 +579,10 @@ def relatorios():
         filtro_data = f"{ano_atual}-{mes_atual:02d}"
 
         # 🔐 Controle de UVIS
-        if current_user.tipo_usuario == 'uvis':
-            uvis_id = current_user.id
-        else:
-            uvis_id = request.args.get('uvis_id', type=int)
+        uvis_id = current_user.id if current_user.tipo_usuario == 'uvis' \
+            else request.args.get('uvis_id', type=int)
 
-        # 🔹 UVIS disponíveis (admin / operário / visualizar)
+        # 🔹 UVIS disponíveis (JSON-safe)
         uvis_disponiveis = []
         if current_user.tipo_usuario in ['admin', 'operario', 'visualizar']:
             uvis_disponiveis = [
@@ -598,17 +595,113 @@ def relatorios():
                 )
             ]
 
-        # 🔹 Histórico mensal (Postgres x SQLite)
+        # 🔹 Compatibilidade Postgres / SQLite
         if db.engine.name == 'postgresql':
             func_mes = db.func.to_char(Solicitacao.data_criacao, 'YYYY-MM')
         else:
             func_mes = db.func.strftime('%Y-%m', Solicitacao.data_criacao)
 
-        # ✅ Mantive ordem cronológica por mês (pra gráfico)
+        # 🔹 Query base
+        base_query = aplicar_filtros_base(
+            db.session.query(Solicitacao),
+            filtro_data,
+            uvis_id
+        )
+
+        # =====================================================
+        # 🔹 TOTAIS POR STATUS (JSON-safe)
+        # =====================================================
+        status_counts = {
+            status: total
+            for status, total in (
+                base_query
+                .with_entities(Solicitacao.status, db.func.count(Solicitacao.id))
+                .group_by(Solicitacao.status)
+                .all()
+            )
+        }
+
+        total_solicitacoes = sum(status_counts.values())
+        total_aprovadas = status_counts.get("APROVADO", 0)
+        total_aprovadas_com_recomendacoes = status_counts.get(
+            "APROVADO COM RECOMENDAÇÕES", 0
+        )
+        total_recusadas = status_counts.get("NEGADO", 0)
+        total_analise = status_counts.get("EM ANÁLISE", 0)
+        total_pendentes = status_counts.get("PENDENTE", 0)
+
+        # =====================================================
+        # 🔹 FUNÇÃO GENÉRICA DE AGRUPAMENTO (JSON-safe)
+        # =====================================================
+        def agrupar_por(campo):
+            resultados = (
+                base_query
+                .with_entities(campo, db.func.count(Solicitacao.id))
+                .group_by(campo)
+                .order_by(db.func.count(Solicitacao.id).desc())
+                .all()
+            )
+
+            return [
+                (valor or "Não informado", total)
+                for valor, total in resultados
+            ]
+
+        dados_status = agrupar_por(Solicitacao.status)
+        dados_foco = agrupar_por(Solicitacao.foco)
+        dados_tipo_visita = agrupar_por(Solicitacao.tipo_visita)
+        dados_altura_voo = agrupar_por(Solicitacao.altura_voo)
+
+        # =====================================================
+        # 🔹 AGRUPAMENTOS COM JOIN (JSON-safe)
+        # =====================================================
+        dados_regiao = [
+            (regiao or "Não informado", total)
+            for regiao, total in (
+                aplicar_filtros_base(
+                    db.session.query(
+                        Usuario.regiao,
+                        db.func.count(Solicitacao.id)
+                    )
+                    .join(Usuario),
+                    filtro_data,
+                    uvis_id
+                )
+                .group_by(Usuario.regiao)
+                .order_by(db.func.count(Solicitacao.id).desc())
+                .all()
+            )
+        ]
+
+        dados_unidade = [
+            (uvis or "Não informado", total)
+            for uvis, total in (
+                aplicar_filtros_base(
+                    db.session.query(
+                        Usuario.nome_uvis,
+                        db.func.count(Solicitacao.id)
+                    )
+                    .join(Usuario)
+                    .filter(Usuario.tipo_usuario == 'uvis'),
+                    filtro_data,
+                    uvis_id
+                )
+                .group_by(Usuario.nome_uvis)
+                .order_by(db.func.count(Solicitacao.id).desc())
+                .all()
+            )
+        ]
+
+        # =====================================================
+        # 🔹 HISTÓRICO MENSAL (JSON-safe)
+        # =====================================================
         dados_mensais = [
             (mes, total)
             for mes, total in (
-                db.session.query(func_mes.label('mes'), db.func.count(Solicitacao.id))
+                db.session.query(
+                    func_mes.label('mes'),
+                    db.func.count(Solicitacao.id)
+                )
                 .group_by('mes')
                 .order_by('mes')
                 .all()
@@ -619,100 +712,6 @@ def relatorios():
             sorted({m.split('-')[0] for m, _ in dados_mensais}, reverse=True)
             if dados_mensais else [ano_atual]
         )
-
-        # 🔹 Query base única
-        base_query = aplicar_filtros_base(
-            db.session.query(Solicitacao),
-            filtro_data,
-            uvis_id
-        )
-
-        # 🔹 Totais
-        total_solicitacoes = base_query.count()
-        total_aprovadas = base_query.filter(Solicitacao.status == "APROVADO").count()
-        total_aprovadas_com_recomendacoes = base_query.filter(
-            Solicitacao.status == "APROVADO COM RECOMENDAÇÕES"
-        ).count()
-        total_recusadas = base_query.filter(Solicitacao.status == "NEGADO").count()
-        total_analise = base_query.filter(Solicitacao.status == "EM ANÁLISE").count()
-        total_pendentes = base_query.filter(Solicitacao.status == "PENDENTE").count()
-
-        # 🔹 Agrupamentos (MAIOR -> MENOR)
-
-        dados_regiao = [
-            (regiao or "Não informado", total)
-            for regiao, total in (
-                aplicar_filtros_base(
-                    db.session.query(Usuario.regiao, db.func.count(Solicitacao.id))
-                    .join(Usuario),
-                    filtro_data,
-                    uvis_id
-                )
-                .group_by(Usuario.regiao)
-                .order_by(db.func.count(Solicitacao.id).desc())   # ✅ maior -> menor
-                .all()
-            )
-        ]
-
-        dados_status = [
-            (status or "Não informado", total)
-            for status, total in (
-                base_query
-                .with_entities(Solicitacao.status, db.func.count(Solicitacao.id))
-                .group_by(Solicitacao.status)
-                .order_by(db.func.count(Solicitacao.id).desc())   # ✅ maior -> menor
-                .all()
-            )
-        ]
-
-        dados_foco = [
-            (foco or "Não informado", total)
-            for foco, total in (
-                base_query
-                .with_entities(Solicitacao.foco, db.func.count(Solicitacao.id))
-                .group_by(Solicitacao.foco)
-                .order_by(db.func.count(Solicitacao.id).desc())   # ✅ maior -> menor
-                .all()
-            )
-        ]
-
-        dados_tipo_visita = [
-            (tipo or "Não informado", total)
-            for tipo, total in (
-                base_query
-                .with_entities(Solicitacao.tipo_visita, db.func.count(Solicitacao.id))
-                .group_by(Solicitacao.tipo_visita)
-                .order_by(db.func.count(Solicitacao.id).desc())   # ✅ maior -> menor
-                .all()
-            )
-        ]
-
-        dados_altura_voo = [
-            (altura or "Não informado", total)
-            for altura, total in (
-                base_query
-                .with_entities(Solicitacao.altura_voo, db.func.count(Solicitacao.id))
-                .group_by(Solicitacao.altura_voo)
-                .order_by(db.func.count(Solicitacao.id).desc())   # ✅ maior -> menor
-                .all()
-            )
-        ]
-
-        dados_unidade = [
-            (uvis or "Não informado", total)
-            for uvis, total in (
-                aplicar_filtros_base(
-                    db.session.query(Usuario.nome_uvis, db.func.count(Solicitacao.id))
-                    .join(Usuario)
-                    .filter(Usuario.tipo_usuario == 'uvis'),
-                    filtro_data,
-                    uvis_id
-                )
-                .group_by(Usuario.nome_uvis)
-                .order_by(db.func.count(Solicitacao.id).desc())   # ✅ maior -> menor
-                .all()
-            )
-        ]
 
         return render_template(
             'relatorios.html',
@@ -745,6 +744,8 @@ def relatorios():
             titulo="Erro nos Relatórios",
             mensagem="Houve um erro técnico ao processar os dados."
         )
+
+
 
 import os
 import tempfile
