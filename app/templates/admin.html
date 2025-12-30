@@ -575,13 +575,12 @@
 
                 // O loading já foi aplicado pelo base.html (listener universal)
 
-                // FORÇA A REVERSÃO do loading após 4 segundos
                 setTimeout(() => {
                     // Verifica se a função global está disponível antes de chamar
                     if (typeof hideLoadingState === 'function') {
                         hideLoadingState(clickedButton);
                     }
-                }, 4000); // 4 segundos
+                }, 2000); // 4 segundos
 
                 // O formulário submete e inicia o download.
             }

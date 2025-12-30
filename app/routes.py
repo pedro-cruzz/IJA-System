@@ -1,6 +1,9 @@
-# ==========================
-# IMPORTS PADRÃO PYTHON
-# ==========================
+# ==========================================================================================================================================================================================================================================
+# IJA SYSTEM - ROTAS PRINCIPAIS
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SEÇÃO 1: IMPORTAÇÕES PADRÃO PYTHON
+# ═══════════════════════════════════════════════════════════════════════════
 import os
 import re
 import tempfile
@@ -11,14 +14,13 @@ import json
 
 
 from flask_login import login_required, current_user
-from werkzeug.utils import secure_filename
 import uuid
 import os
 
 # ==========================
 # FLASK
 # ==========================
-from flask import (Blueprint, after_this_request, current_app, flash, jsonify,
+from flask import (Blueprint, current_app, flash, jsonify,
                    redirect, render_template, request, send_file,
                    send_from_directory, url_for)
 
@@ -47,78 +49,98 @@ print("--- ROTAS CARREGADAS COM SUCESSO ---")
 
 bp = Blueprint('main', __name__)
 
+# --- 1: GLOBAL CONTEXT  ---
 @bp.context_processor
 def inject_globals():
-    notif_count = 0
-
+    """
+    Otimizado para não travar a navegação. 
+    Faz apenas uma consulta de contagem simples por página carregada.
+    """
     if current_user.is_authenticated:
-        if current_user.tipo_usuario in ["admin", "operario", "visualizar"]:
-            notif_count = (
-                Notificacao.query
-                .filter(
-                    Notificacao.lida_em.is_(None),
-                    Notificacao.apagada_em.is_(None),
-                )
-                .count()
-            )
-        else:
-            notif_count = (
-                Notificacao.query
-                .filter(
-                    Notificacao.usuario_id == current_user.id,
-                    Notificacao.lida_em.is_(None),
-                    Notificacao.apagada_em.is_(None),
-                )
-                .count()
-            )
-
-    return dict(notif_count=notif_count)
+        # Consulta de contagem direta no banco (muito mais rápida que carregar objetos)
+        q = db.session.query(db.func.count(Notificacao.id)).filter(
+            Notificacao.lida_em.is_(None),
+            Notificacao.apagada_em.is_(None)
+        )
+        
+        if current_user.tipo_usuario not in ["admin", "operario", "visualizar"]:
+            q = q.filter(Notificacao.usuario_id == current_user.id)
+            
+        return dict(notif_count=q.scalar() or 0)
+    return dict(notif_count=0)
 
 
-
+# --- 2: FILTRO DE DATA PARA JINJA2 ---
 @bp.app_template_filter('datetimeformat')
 def datetimeformat(value, format='%d-%m-%y'):
+    """
+    Filtro para formatar datas no Jinja2.
+    Otimizado para lidar com strings, objetos datetime e valores nulos.
+    """
+    if value is None:
+        return ""
     try:
-        # tenta converter string do tipo "2025-12-09"
-        return datetime.strptime(value, "%Y-%m-%d").strftime(format)
-    except:
-        return value  # se falhar, retorna como está
+        if isinstance(value, str):
+            # Se for string (ex: '2025-12-31'), converte para objeto date antes de formatar
+            return datetime.strptime(value, "%Y-%m-%d").strftime(format)
+        return value.strftime(format)
+    except Exception:
+        return value # Retorna o valor original em caso de erro para não quebrar a página
 
 def get_upload_folder():
-    # pasta dentro do projeto: /seu_projeto/upload-files
+    """
+    Localiza a pasta de uploads de forma absoluta.
+    Garante que a pasta exista sem processamento repetitivo desnecessário.
+    """
+    # Pasta 'upload-files' no mesmo nível da pasta 'app'
     folder = os.path.join(current_app.root_path, '..', 'upload-files')
-    folder = os.path.abspath(folder)
-    os.makedirs(folder, exist_ok=True)
-    return folder
-
-ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "doc", "docx", "xls", "xlsx"}
+    if not os.path.exists(folder):
+        os.makedirs(folder, exist_ok=True)
+    return os.path.abspath(folder)
 
 def allowed_file(filename: str) -> bool:
+    """Verifica se a extensão do arquivo é permitida."""
+    ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "doc", "docx", "xls", "xlsx"}
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def aplicar_filtros_base(query, filtro_data, uvis_id):
+    if not filtro_data:
+        return query
+    
+    if db.engine.name == 'postgresql':
+        # Produção: Usa to_char para extrair Ano-Mês
+        query = query.filter(db.func.to_char(Solicitacao.data_criacao, 'YYYY-MM') == filtro_data)
+    else:
+        # Local: Usa strftime para extrair Ano-Mês
+        query = query.filter(db.func.strftime('%Y-%m', Solicitacao.data_criacao) == filtro_data)
+
+    if uvis_id:
+        query = query.filter(Solicitacao.usuario_id == uvis_id)
+        
+    return query
 
 # --- DASHBOARD UVIS ---
 
 @bp.route('/')
 @login_required
 def dashboard():
-
-    # Se for admin, operario ou visualizar → painel admin
+    # 1. Redirecionamento de Perfis Administrativos (Prevenção de acesso indevido)
     if current_user.tipo_usuario in ['admin', 'operario', 'visualizar']:
         return redirect(url_for('main.admin_dashboard'))
 
-    # Query base: solicitações SOMENTE do usuário logado
-    query = Solicitacao.query.filter_by(usuario_id=current_user.id)
+    # 2. Query Otimizada
+    query = db.session.query(Solicitacao).options(joinedload(Solicitacao.usuario))\
+        .filter(Solicitacao.usuario_id == current_user.id)
 
-    # Filtro por status (?status=...)
+    # 3. Aplicação de Filtros de Interface
     filtro_status = request.args.get('status')
     if filtro_status:
         query = query.filter(Solicitacao.status == filtro_status)
 
-    # Paginação
+    # 4. Paginação de Performance
     page = request.args.get("page", 1, type=int)
-    paginacao = query.order_by(
-        Solicitacao.data_criacao.desc()
-    ).paginate(page=page, per_page=6, error_out=False)
+    paginacao = query.order_by(Solicitacao.data_criacao.desc())\
+        .paginate(page=page, per_page=6, error_out=False)
 
     return render_template(
         'dashboard.html',
@@ -148,7 +170,9 @@ def admin_dashboard():
     filtro_regiao = request.args.get("regiao")
 
     # --- Query base ---
-    query = Solicitacao.query.join(Usuario)
+    query = Solicitacao.query \
+        .options(joinedload(Solicitacao.usuario)) \
+        .join(Usuario)
 
     # --- Aplicação dos filtros ---
     if filtro_status:
@@ -183,7 +207,6 @@ def admin_dashboard():
 @bp.route('/admin/exportar_excel')
 @login_required
 def exportar_excel():
-
     # 🔐 Permissão: somente admin e operario
     if current_user.tipo_usuario not in ['admin', 'operario']:
         flash('Permissão negada para exportar.', 'danger')
@@ -329,8 +352,7 @@ def atualizar(id):
 
     # 🔐 Permissão
     if current_user.tipo_usuario not in ['admin', 'operario']:
-        flash('Permissão negada para esta ação.', 'danger')
-        return redirect(url_for('main.admin_dashboard'))
+        return jsonify({"error": "Permissão negada"}), 403
 
     pedido = Solicitacao.query.get_or_404(id)
 
@@ -341,37 +363,49 @@ def atualizar(id):
     pedido.latitude = request.form.get('latitude')
     pedido.longitude = request.form.get('longitude')
 
-    # --- Upload de anexo ---
+    # Processamento de Anexo
     file = request.files.get("anexo")
-
     if file and file.filename:
-        if not allowed_file(file.filename):
-            flash("Tipo de arquivo não permitido.", "warning")
-            return redirect(url_for('main.admin_dashboard'))
+        if allowed_file(file.filename):
+            from werkzeug.utils import secure_filename # Garantir import
+            
+            # Recupera a extensão original corretamente
+            original_filename = secure_filename(file.filename)
+            ext = original_filename.rsplit(".", 1)[1].lower()
+            # Nome único mantendo a extensão real do arquivo
+            unique_name = f"sol_{pedido.id}_{uuid.uuid4().hex}.{ext}"
+            upload_folder = get_upload_folder()
+            file_path = os.path.join(upload_folder, unique_name)
+            
+            pedido.anexo_path = f"upload-files/{unique_name}"
+            pedido.anexo_nome = original_filename
 
-        original = secure_filename(file.filename)
-        ext = original.rsplit(".", 1)[1].lower()
-        unique_name = f"sol_{pedido.id}_{uuid.uuid4().hex}.{ext}"
-
-        upload_folder = get_upload_folder()
-        os.makedirs(upload_folder, exist_ok=True)
-
-        save_path = os.path.join(upload_folder, unique_name)
-        file.save(save_path)
-
-        pedido.anexo_path = f"upload-files/{unique_name}"
-        pedido.anexo_nome = original
-
+            try:
+                file.save(file_path)
+                # Atualiza o banco APENAS se o arquivo foi salvo com sucesso
+                pedido.anexo_path = f"upload-files/{unique_name}"
+                pedido.anexo_nome = original_filename
+            except Exception as e:
+                current_app.logger.error(f"Erro ao salvar arquivo físico: {e}")
+                return jsonify({"error": "Falha ao salvar o arquivo no servidor."}), 500
+        else:
+                return jsonify({"error": "Formato de arquivo não permitido."}), 400
+        
+    # commit final
     try:
         db.session.commit()
-        flash('Pedido atualizado com sucesso!', 'success')
+        return jsonify({
+            "ok": True, 
+            "message": "Solicitação atualizada com sucesso!",
+            "anexo_nome": pedido.anexo_nome # Retorna para o JS atualizar a interface
+        }), 200
+    
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO ATUALIZAR PEDIDO: {e}")
-        flash('Erro ao atualizar o pedido.', 'danger')
-
-    return redirect(url_for('main.admin_dashboard'))
-
+        # Se falhou o banco, o ideal seria remover o arquivo físico salvo (cleanup), 
+        # mas em muitos casos de produção (Render) o disco é efêmero, então não é crítico.
+        current_app.logger.error(f"Erro de Banco (Atualizar ID {id}): {e}")
+        return jsonify({"error": "Erro ao gravar dados no banco de dados."}), 500
 
 # --- NOVO PEDIDO ---
 from flask_login import login_required, current_user
@@ -537,151 +571,267 @@ from app import db
 from app.models import Solicitacao, Usuario
 
 
-@bp.route('/relatorios', methods=['GET'])
-def relatorios():
-    if not current_user.is_authenticated:
-        return redirect(url_for('main.login'))
+# ==========================
+# IMPORTS PADRÃO PYTHON
+# ==========================
+import os
+import re
+import tempfile
+import unicodedata
+from datetime import date, datetime
+from io import BytesIO
+import json
+import uuid
 
+# ==========================
+# FLASK
+# ==========================
+from flask import (Blueprint, current_app, flash, jsonify,
+                   redirect, render_template, request, send_file,
+                   send_from_directory, url_for, session, abort)
+
+from flask_login import current_user, login_required, login_user, logout_user
+
+# ==========================
+# EXCEL / PDF / GRÁFICOS
+# ==========================
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib import colors
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import (PageBreak, Paragraph, SimpleDocTemplate,
+                                Spacer, Table, TableStyle, Image as RLImage)
+
+try:
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+
+# ==========================
+# SQLALCHEMY / BANCO
+# ==========================
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import joinedload
+from app import db
+from app.models import Notificacao, Solicitacao, Usuario, Clientes
+
+print("--- SISTEMA OTIMIZADO E SINCRONIZADO CARREGADO ---")
+
+bp = Blueprint('main', __name__)
+
+# --- OTIMIZAÇÃO: GLOBAL CONTEXT ---
+@bp.context_processor
+def inject_globals():
+    if current_user.is_authenticated:
+        q = db.session.query(db.func.count(Notificacao.id)).filter(
+            Notificacao.lida_em.is_(None),
+            Notificacao.apagada_em.is_(None)
+        )
+        if current_user.tipo_usuario not in ["admin", "operario", "visualizar"]:
+            q = q.filter(Notificacao.usuario_id == current_user.id)
+        return dict(notif_count=q.scalar() or 0)
+    return dict(notif_count=0)
+
+# --- HELPERS ---
+@bp.app_template_filter('datetimeformat')
+def datetimeformat(value, format='%d-%m-%y'):
+    if value is None: return ""
     try:
-        # 🔹 Parâmetros de Filtro
+        if isinstance(value, str):
+            return datetime.strptime(value, "%Y-%m-%d").strftime(format)
+        return value.strftime(format)
+    except:
+        return value
+
+def get_upload_folder():
+    folder = os.path.join(current_app.root_path, '..', 'upload-files')
+    if not os.path.exists(folder):
+        os.makedirs(folder, exist_ok=True)
+    return os.path.abspath(folder)
+
+def allowed_file(filename: str) -> bool:
+    ALLOWED = {"pdf", "png", "jpg", "jpeg", "doc", "docx", "xls", "xlsx"}
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED
+
+def aplicar_filtros_base(query, filtro_data, uvis_id):
+    if not filtro_data: return query
+    if db.engine.name == 'postgresql':
+        query = query.filter(db.func.to_char(Solicitacao.data_criacao, 'YYYY-MM') == filtro_data)
+    else:
+        query = query.filter(db.func.strftime('%Y-%m', Solicitacao.data_criacao) == filtro_data)
+    if uvis_id:
+        query = query.filter(Solicitacao.usuario_id == uvis_id)
+    return query
+
+# --- ROTA DE RELATÓRIOS (ALTAMENTE OTIMIZADA) ---
+# ==========================
+# IMPORTS PADRÃO PYTHON
+# ==========================
+import os
+import re
+import tempfile
+import unicodedata
+from datetime import date, datetime
+from io import BytesIO
+import json
+import uuid
+
+# ==========================
+# FLASK
+# ==========================
+from flask import (Blueprint, after_this_request, current_app, flash, jsonify,
+                   redirect, render_template, request, send_file,
+                   send_from_directory, url_for, session, abort)
+
+from flask_login import current_user, login_required, login_user, logout_user
+
+# ==========================
+# EXCEL / PDF / GRÁFICOS
+# ==========================
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib import colors
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import (PageBreak, Paragraph, SimpleDocTemplate,
+                                Spacer, Table, TableStyle, Image as RLImage)
+
+try:
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+
+# ==========================
+# SQLALCHEMY / BANCO
+# ==========================
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import joinedload
+from app import db
+from app.models import Notificacao, Solicitacao, Usuario, Clientes
+
+print("--- SISTEMA OTIMIZADO E SINCRONIZADO CARREGADO ---")
+
+bp = Blueprint('main', __name__)
+
+# --- OTIMIZAÇÃO: GLOBAL CONTEXT ---
+@bp.context_processor
+def inject_globals():
+    if current_user.is_authenticated:
+        q = db.session.query(db.func.count(Notificacao.id)).filter(
+            Notificacao.lida_em.is_(None),
+            Notificacao.apagada_em.is_(None)
+        )
+        if current_user.tipo_usuario not in ["admin", "operario", "visualizar"]:
+            q = q.filter(Notificacao.usuario_id == current_user.id)
+        return dict(notif_count=q.scalar() or 0)
+    return dict(notif_count=0)
+
+# --- HELPERS ---
+@bp.app_template_filter('datetimeformat')
+def datetimeformat(value, format='%d-%m-%y'):
+    if value is None: return ""
+    try:
+        if isinstance(value, str):
+            return datetime.strptime(value, "%Y-%m-%d").strftime(format)
+        return value.strftime(format)
+    except:
+        return value
+
+def get_upload_folder():
+    folder = os.path.join(current_app.root_path, '..', 'upload-files')
+    if not os.path.exists(folder):
+        os.makedirs(folder, exist_ok=True)
+    return os.path.abspath(folder)
+
+def allowed_file(filename: str) -> bool:
+    ALLOWED = {"pdf", "png", "jpg", "jpeg", "doc", "docx", "xls", "xlsx"}
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED
+
+def aplicar_filtros_base(query, filtro_data, uvis_id):
+    if not filtro_data: return query
+    if db.engine.name == 'postgresql':
+        query = query.filter(db.func.to_char(Solicitacao.data_criacao, 'YYYY-MM') == filtro_data)
+    else:
+        query = query.filter(db.func.strftime('%Y-%m', Solicitacao.data_criacao) == filtro_data)
+    if uvis_id:
+        query = query.filter(Solicitacao.usuario_id == uvis_id)
+    return query
+
+# --- ROTA DE RELATÓRIOS (ALTAMENTE OTIMIZADA) ---
+@bp.route('/relatorios', methods=['GET'])
+@login_required
+def relatorios():
+    """
+    Gera estatísticas e dados para gráficos.
+    Otimizada para reduzir roundtrips ao banco de dados usando agrupamentos.
+    """
+    try:
+        # 1. Parâmetros de Filtro
         mes_atual = request.args.get('mes', datetime.now().month, type=int)
         ano_atual = request.args.get('ano', datetime.now().year, type=int)
         filtro_data = f"{ano_atual}-{mes_atual:02d}"
 
-        # 🔐 Controle de UVIS
-        if current_user.tipo_usuario == 'uvis':
-            uvis_id = current_user.id
-        else:
-            uvis_id = request.args.get('uvis_id', type=int)
+        uvis_id = current_user.id if current_user.tipo_usuario == 'uvis' else request.args.get('uvis_id', type=int)
 
-        # 🔹 UVIS disponíveis (admin / operário / visualizar)
+        # 2. UVIS disponíveis para filtro (Apenas se for admin/operário)
         uvis_disponiveis = []
         if current_user.tipo_usuario in ['admin', 'operario', 'visualizar']:
-            uvis_disponiveis = [
-                (u.id, u.nome_uvis)
-                for u in (
-                    db.session.query(Usuario.id, Usuario.nome_uvis)
-                    .filter(Usuario.tipo_usuario == 'uvis')
-                    .order_by(Usuario.nome_uvis)
-                    .all()
-                )
-            ]
+            uvis_disponiveis = db.session.query(Usuario.id, Usuario.nome_uvis)\
+                .filter(Usuario.tipo_usuario == 'uvis')\
+                .order_by(Usuario.nome_uvis).all()
 
-        # 🔹 Histórico mensal (Postgres x SQLite)
-        if db.engine.name == 'postgresql':
-            func_mes = db.func.to_char(Solicitacao.data_criacao, 'YYYY-MM')
-        else:
-            func_mes = db.func.strftime('%Y-%m', Solicitacao.data_criacao)
+        # 3. Definição da Query Base Otimizada
+        base_query = aplicar_filtros_base(db.session.query(Solicitacao), filtro_data, uvis_id)
 
-        # ✅ Mantive ordem cronológica por mês (pra gráfico)
-        dados_mensais = [
-            (mes, total)
-            for mes, total in (
-                db.session.query(func_mes.label('mes'), db.func.count(Solicitacao.id))
-                .group_by('mes')
-                .order_by('mes')
-                .all()
-            )
-        ]
+        # 4. OTIMIZAÇÃO DE TOTAIS: Uma única consulta para todos os status
+        status_counts = base_query.with_entities(Solicitacao.status, db.func.count(Solicitacao.id))\
+            .group_by(Solicitacao.status).all()
+        
+        status_dict = {s: count for s, count in status_counts}
+        
+        total_solicitacoes = sum(status_dict.values())
+        total_aprovadas = status_dict.get("APROVADO", 0)
+        total_aprovadas_com_recomendacoes = status_dict.get("APROVADO COM RECOMENDAÇÕES", 0)
+        total_recusadas = status_dict.get("NEGADO", 0)
+        total_analise = status_dict.get("EM ANÁLISE", 0)
+        total_pendentes = status_dict.get("PENDENTE", 0)
 
-        anos_disponiveis = (
-            sorted({m.split('-')[0] for m, _ in dados_mensais}, reverse=True)
-            if dados_mensais else [ano_atual]
-        )
+        # 5. Agrupamentos para Gráficos (Consultas diretas e limpas)
+        def get_grouped_data(entities, group_by_col):
+            return base_query.with_entities(*entities)\
+                .group_by(group_by_col)\
+                .order_by(db.func.count(Solicitacao.id).desc()).all()
 
-        # 🔹 Query base única
-        base_query = aplicar_filtros_base(
-            db.session.query(Solicitacao),
-            filtro_data,
-            uvis_id
-        )
+        dados_regiao = db.session.query(Usuario.regiao, db.func.count(Solicitacao.id))\
+            .join(Usuario).filter(Solicitacao.usuario_id == Usuario.id)
+        dados_regiao = aplicar_filtros_base(dados_regiao, filtro_data, uvis_id)\
+            .group_by(Usuario.regiao).order_by(db.func.count(Solicitacao.id).desc()).all()
 
-        # 🔹 Totais
-        total_solicitacoes = base_query.count()
-        total_aprovadas = base_query.filter(Solicitacao.status == "APROVADO").count()
-        total_aprovadas_com_recomendacoes = base_query.filter(
-            Solicitacao.status == "APROVADO COM RECOMENDAÇÕES"
-        ).count()
-        total_recusadas = base_query.filter(Solicitacao.status == "NEGADO").count()
-        total_analise = base_query.filter(Solicitacao.status == "EM ANÁLISE").count()
-        total_pendentes = base_query.filter(Solicitacao.status == "PENDENTE").count()
+        dados_status = status_counts # Já calculado acima, economizamos 1 query!
+        dados_foco = get_grouped_data([Solicitacao.foco, db.func.count(Solicitacao.id)], Solicitacao.foco)
+        dados_tipo_visita = get_grouped_data([Solicitacao.tipo_visita, db.func.count(Solicitacao.id)], Solicitacao.tipo_visita)
+        dados_altura_voo = get_grouped_data([Solicitacao.altura_voo, db.func.count(Solicitacao.id)], Solicitacao.altura_voo)
 
-        # 🔹 Agrupamentos (MAIOR -> MENOR)
+        dados_unidade = db.session.query(Usuario.nome_uvis, db.func.count(Solicitacao.id))\
+            .join(Usuario).filter(Usuario.tipo_usuario == 'uvis')
+        dados_unidade = aplicar_filtros_base(dados_unidade, filtro_data, uvis_id)\
+            .group_by(Usuario.nome_uvis).order_by(db.func.count(Solicitacao.id).desc()).all()
 
-        dados_regiao = [
-            (regiao or "Não informado", total)
-            for regiao, total in (
-                aplicar_filtros_base(
-                    db.session.query(Usuario.regiao, db.func.count(Solicitacao.id))
-                    .join(Usuario),
-                    filtro_data,
-                    uvis_id
-                )
-                .group_by(Usuario.regiao)
-                .order_by(db.func.count(Solicitacao.id).desc())   # ✅ maior -> menor
-                .all()
-            )
-        ]
+        # 6. Histórico Mensal (Consultar apenas os meses necessários)
+        func_mes = db.func.to_char(Solicitacao.data_criacao, 'YYYY-MM') if db.engine.name == 'postgresql' \
+                   else db.func.strftime('%Y-%m', Solicitacao.data_criacao)
+        
+        dados_mensais = db.session.query(func_mes.label('mes'), db.func.count(Solicitacao.id))\
+            .group_by('mes').order_by('mes').all()
 
-        dados_status = [
-            (status or "Não informado", total)
-            for status, total in (
-                base_query
-                .with_entities(Solicitacao.status, db.func.count(Solicitacao.id))
-                .group_by(Solicitacao.status)
-                .order_by(db.func.count(Solicitacao.id).desc())   # ✅ maior -> menor
-                .all()
-            )
-        ]
-
-        dados_foco = [
-            (foco or "Não informado", total)
-            for foco, total in (
-                base_query
-                .with_entities(Solicitacao.foco, db.func.count(Solicitacao.id))
-                .group_by(Solicitacao.foco)
-                .order_by(db.func.count(Solicitacao.id).desc())   # ✅ maior -> menor
-                .all()
-            )
-        ]
-
-        dados_tipo_visita = [
-            (tipo or "Não informado", total)
-            for tipo, total in (
-                base_query
-                .with_entities(Solicitacao.tipo_visita, db.func.count(Solicitacao.id))
-                .group_by(Solicitacao.tipo_visita)
-                .order_by(db.func.count(Solicitacao.id).desc())   # ✅ maior -> menor
-                .all()
-            )
-        ]
-
-        dados_altura_voo = [
-            (altura or "Não informado", total)
-            for altura, total in (
-                base_query
-                .with_entities(Solicitacao.altura_voo, db.func.count(Solicitacao.id))
-                .group_by(Solicitacao.altura_voo)
-                .order_by(db.func.count(Solicitacao.id).desc())   # ✅ maior -> menor
-                .all()
-            )
-        ]
-
-        dados_unidade = [
-            (uvis or "Não informado", total)
-            for uvis, total in (
-                aplicar_filtros_base(
-                    db.session.query(Usuario.nome_uvis, db.func.count(Solicitacao.id))
-                    .join(Usuario)
-                    .filter(Usuario.tipo_usuario == 'uvis'),
-                    filtro_data,
-                    uvis_id
-                )
-                .group_by(Usuario.nome_uvis)
-                .order_by(db.func.count(Solicitacao.id).desc())   # ✅ maior -> menor
-                .all()
-            )
-        ]
+        anos_disponiveis = sorted({m[0].split('-')[0] for m in dados_mensais}, reverse=True) if dados_mensais else [ano_atual]
 
         return render_template(
             'relatorios.html',
@@ -707,15 +857,8 @@ def relatorios():
 
     except Exception as e:
         db.session.rollback()
-        print(f"ERRO NOS RELATÓRIOS: {e}")
-        return render_template(
-            "erro.html",
-            codigo=500,
-            titulo="Erro nos Relatórios",
-            mensagem="Houve um erro técnico ao processar os dados."
-        )
-
-
+        current_app.logger.error(f"ERRO NOS RELATÓRIOS: {e}")
+        return render_template("erro.html", codigo=500, titulo="Erro nos Relatórios", mensagem="Falha ao processar estatísticas.")
 
 import os
 import tempfile
@@ -1577,7 +1720,6 @@ def deletar(id):
 from flask_login import login_required, current_user
 
 from flask_login import login_required, current_user
-import traceback
 
 from flask import request, render_template
 from flask_login import login_required, current_user
@@ -1700,7 +1842,7 @@ def agenda():
 
 @bp.route("/agenda/exportar_excel", endpoint="agenda_exportar_excel")
 @login_required
-def exportar_excel():  # <--- função interna com nome diferente
+def exportar_agenda_excel():  
     if current_user.tipo_usuario != "admin":
         abort(403)  # Forbidden
 

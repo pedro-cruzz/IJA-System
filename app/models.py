@@ -38,7 +38,7 @@ class Usuario(UserMixin, db.Model):
 class Solicitacao(db.Model):
     __tablename__ = 'solicitacoes'
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, )
 
     # ----------------------
     # Dados Básicos e Data
@@ -82,13 +82,14 @@ class Solicitacao(db.Model):
     # ----------------------
     protocolo = db.Column(db.String(50))
     justificativa = db.Column(db.String(255))
-    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
-    status = db.Column(db.String(30), default="EM ANÁLISE")
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow,index=True)
+    status = db.Column(db.String(30), default="EM ANÁLISE", index=True)
 
     usuario_id = db.Column(
         db.Integer,
         db.ForeignKey("usuarios.id"),
-        nullable=False
+        nullable=False,
+        index = True
     )
 
     usuario = db.relationship("Usuario", back_populates="solicitacoes")
@@ -112,8 +113,8 @@ class Notificacao(db.Model):
 class Clientes(db.Model):
     __tablename__ = "clientes"
 
-    id = db.Column(db.Integer, primary_key=True)
-    nome_cliente = db.Column(db.String(100), nullable=False)
+    id = db.Column(db.Integer, primary_key=True, index=True)
+    nome_cliente = db.Column(db.String(100), nullable=False, index=True)
     documento = db.Column(db.String(50), unique=True, nullable=False)
     contato = db.Column(db.String(100))
     telefone = db.Column(db.String(20))
