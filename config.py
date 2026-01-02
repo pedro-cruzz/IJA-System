@@ -3,8 +3,15 @@ import os
 class Config:
     # Gera uma chave secreta aleatória ou usa uma fixa
     SECRET_KEY = os.environ.get('SECRET_KEY')
+    uri = os.environ.get('DATABASE_URL')
     
     # Caminho do Banco de Dados
-    BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-    SQLALCHEMY_DATABASE_URI = 'postgresql:///' + os.path.join(BASE_DIR, 'instance', 'sgsv.db')
+
+    if uri and uri.startswith("postgres://"):
+        uri = uri.replace("postgres://", "postgresql://", 1)
+
+    # configuração sqlalchemy
+    SQLALCHEMY_DATABASE_URI = uri
+    
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SECRET_KEY = os.environ.get('SECRET_KEY', 'chave-secreta-de-backup')

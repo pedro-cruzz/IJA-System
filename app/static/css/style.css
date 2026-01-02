@@ -253,7 +253,8 @@ body.dark-mode {
   --color-primary: #4ca3ff;
   --color-accent: #00e0ff;
   --color-accent-hover: #00b4cc;
-  --color-success: #38a169;
+  --color-success: #2e8559;
+  --color-success-hover: #29ab5b;
   --color-warning: #eac808;
   --color-danger:  #e53e3e;
   --color-recomended: #e66f00;
@@ -310,6 +311,8 @@ body.dark-mode .small { color: var(--color-text-main) !important; }
 body.dark-mode .btn-dark { background: var(--color-text-muted); color: var(--color-bg-body); }
 body.dark-mode .btn.btn-success { background: var(--color-primary) !important; border-color: var(--color-primary-dark) !important; color: var(--color-text-main); }
 body.dark-mode .btn-success:hover { background: var(--color-accent) !important; border-color: var(--color-accent-hover) !important; }
+body.dark-mode .btn-secondary { background-color: var(--color-success); border-color: var(--color-success); color: #fff; }
+body.dark-mode .btn-secondary:hover { background-color: var(--color-success-hover); border-color: var(--color-success-hover); transform: translateY(-2px); box-shadow: var(--shadow-md); }
 body.dark-mode .text-muted { color: var(--color-text-muted) !important; }
 body.dark-mode .rua { color: var(--color-accent); }
 

@@ -88,7 +88,7 @@ class Solicitacao(db.Model):
 
     data_criacao = db.Column(
         db.DateTime,
-        default=datetime.utcnow,
+        default=datetime.now,
         index=True
     )
 
@@ -146,7 +146,7 @@ class Notificacao(db.Model):
 
     criada_em = db.Column(
         db.DateTime,
-        default=datetime.utcnow,
+        default=datetime.now,
         nullable=False,
         index=True
     )

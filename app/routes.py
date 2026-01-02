@@ -101,36 +101,27 @@ def allowed_file(filename: str) -> bool:
     ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "doc", "docx", "xls", "xlsx"}
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-from sqlalchemy import extract
+from sqlalchemy import extract, cast, Integer
 
 def aplicar_filtros_base(query, filtro_data, uvis_id):
-    """Aplica o filtro de mês/ano e opcionalmente o filtro de UVIS."""
-    
     if filtro_data:
-        # filtro_data vem como "2026-11"
         try:
+            # filtro_data = "2026-01"
             ano, mes = map(int, filtro_data.split('-'))
             
-            # Usar extract funciona tanto em SQLite quanto em Postgres de forma nativa
-            # Estamos filtrando pela data_criacao conforme seu modelo
+            # Forçamos a comparação de INTEIRO com INTEIRO
             query = query.filter(
-                extract('year', Solicitacao.data_criacao) == ano,
-                extract('month', Solicitacao.data_criacao) == mes
+                cast(extract('year', Solicitacao.data_agendamento), Integer) == ano,
+                cast(extract('month', Solicitacao.data_agendamento), Integer) == mes
             )
+            print(f"DEBUG SQL: Filtrando por Ano={ano} e Mes={mes}")
         except Exception as e:
-            print(f"Erro ao processar filtro_data: {e}")
+            print(f"Erro no filtro de data: {e}")
 
-    # Filtro de UVIS
     if uvis_id:
-        # Se for admin/operario, o uvis_id vem do request.args. 
-        # Se for uvis, vem do current_user.id
-        try:
-            query = query.filter(Solicitacao.usuario_id == int(uvis_id))
-        except (ValueError, TypeError):
-            pass
+        query = query.filter(Solicitacao.usuario_id == int(uvis_id))
             
     return query
-
 # --- DASHBOARD UVIS ---
 
 @bp.route('/')
@@ -598,6 +589,11 @@ def relatorios():
             uvis_id
         )
 
+        base_query = aplicar_filtros_base(db.session.query(Solicitacao), filtro_data, uvis_id)
+
+        # ADICIONE ISSO AQUI:
+        print("SQL EXECUTADO:", str(base_query.statement.compile(dialect=db.engine.dialect)))
+
         # =====================================================
         # 🔹 TOTAIS POR STATUS (JSON-safe)
         # =====================================================
@@ -675,12 +671,12 @@ def relatorios():
             (f"{int(ano_h):04d}-{int(mes_h):02d}", total)
             for ano_h, mes_h, total in (
                 db.session.query(
-                    extract('year', Solicitacao.data_criacao),
-                    extract('month', Solicitacao.data_criacao),
+                    extract('year', Solicitacao.data_agendamento),
+                    extract('month', Solicitacao.data_agendamento),
                     db.func.count(Solicitacao.id)
                 )
-                .group_by(extract('year', Solicitacao.data_criacao), extract('month', Solicitacao.data_criacao))
-                .order_by(extract('year', Solicitacao.data_criacao), extract('month', Solicitacao.data_criacao))
+                .group_by(extract('year', Solicitacao.data_agendamento), extract('month', Solicitacao.data_agendamento))
+                .order_by(extract('year', Solicitacao.data_agendamento), extract('month', Solicitacao.data_agendamento))
                 .all()
             )
         ]
