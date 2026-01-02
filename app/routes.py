@@ -2401,7 +2401,7 @@ def _clean_answer(text: str) -> str:
     return text.strip()
 
 
-ADMIN_FAQ = [
+FAQ_DATA = [
     {
         "title": "Perfis e permissões",
         "keywords": ["acesso", "perfil", "permissao", "permissões", "admin", "operario", "operário", "visualizar", "quem pode"],
@@ -2523,76 +2523,72 @@ ADMIN_FAQ = [
     },
 ]
 
+def buscar_no_faq(msg: str):
+    msg_l = msg.lower()
+    for item in FAQ_DATA:
+        for kw in item.get("keywords", []):
+            if kw.lower() in msg_l:
+                return item.get("answer")
+    return None
+
+
+def faq_como_texto() -> str:
+    return "\n\n".join(
+        f"TÓPICO: {i['title']}\n{i['answer']}"
+        for i in FAQ_DATA
+    )
+
+from flask import jsonify, request
+from flask_login import login_required, current_user
+
+from app.ai_client import responder_ia
+
+def buscar_no_faq(msg: str):
+    msg_l = msg.lower()
+    for item in FAQ_DATA:
+        for kw in item.get("keywords", []):
+            if kw.lower() in msg_l:
+                return item.get("answer")
+    return None
 
 @bp.route("/api/admin/chatbot", methods=["POST"])
 @login_required
 def admin_chatbot():
-    # 🔐 só perfis do painel
     if current_user.tipo_usuario not in ["admin", "operario", "visualizar"]:
-        return jsonify({"answer": "Acesso negado para este chatbot."}), 403
+        return jsonify({"answer": "Acesso negado."}), 403
 
     payload = request.get_json(silent=True) or {}
     msg = (payload.get("message") or "").strip()
 
     if not msg:
-        return jsonify({"answer": "Digite sua dúvida (ex.: como exportar Excel?)."}), 400
+        return jsonify({"answer": "Digite sua dúvida."}), 400
 
-    nmsg = _norm_admin(msg)
+    # 1️⃣ tenta FAQ direto (rápido)
+    resposta_faq = buscar_no_faq(msg)
+    if resposta_faq:
+        return jsonify({"answer": resposta_faq})
 
-    best = None
-    best_score = 0
+    # 2️⃣ IA usando o FAQ como base
+    try:
+        contexto = (
+            "Você é o assistente do painel administrativo do sistema IJA.\n"
+            "Use APENAS as informações abaixo para responder.\n"
+            "Se a pergunta não estiver coberta, diga que não há informação.\n\n"
+            "BASE DE CONHECIMENTO:\n"
+            f"{faq_como_texto()}"
+        )
 
-    for item in ADMIN_FAQ:
-        score = 0
-        for kw in item["keywords"]:
-            if kw in nmsg:
-                score += 1
-        if score > best_score:
-            best_score = score
-            best = item
+        answer = responder_ia(msg, contexto=contexto)
 
-    if not best or best_score == 0:
-        sugestoes = [
-            "Como filtrar por status/unidade/região?",
-            "Como salvar decisão (status/protocolo/justificativa)?",
-            "Como editar completo?",
-            "Como exportar Excel?",
-            "Como funciona Agenda/Relatórios?",
-            "Como gerenciar UVIS?",
-        ]
         return jsonify({
-            "answer": "Não achei essa dúvida direto no guia.\n\nSugestões:\n- " + "\n- ".join(sugestoes),
-            "matched": None,
-            "confidence": 0,
-        }), 200
+            "answer": answer or "Não encontrei essa informação no sistema."
+        })
 
-    return jsonify({
-        "answer": _clean_answer(best["answer"]),
-        "matched": best["title"],
-        "confidence": best_score,
-    }), 200
-
-
-
-@bp.app_errorhandler(404)
-def pagina_nao_encontrada(e):
-    return render_template(
-        'erro.html', 
-        codigo=404, 
-        titulo="Página não encontrada", 
-        mensagem="Ops! A página que você está procurando não existe ou foi movida."
-    ), 404
-
-@bp.app_errorhandler(500)
-def erro_interno(e):
-    # Opcional: printar o erro no terminal para você ver o que houve
-    # print(f"Erro 500 detectado: {e}")
-    return render_template(
-        'erro.html', 
-        codigo=500, 
-        titulo="Erro Interno do Servidor", 
-        mensagem="Desculpe, algo deu errado do nosso lado. Tente novamente mais tarde."
-    ), 500
+    except Exception as e:
+        print(f"[CHATBOT IA] erro: {e}")
+        return jsonify({
+            "answer": "Erro ao consultar o assistente. Tente novamente."
+        }), 500
 
 import re
 import requests
