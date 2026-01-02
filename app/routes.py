@@ -101,20 +101,34 @@ def allowed_file(filename: str) -> bool:
     ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "doc", "docx", "xls", "xlsx"}
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def aplicar_filtros_base(query, filtro_data, uvis_id):
-    if not filtro_data:
-        return query
-    
-    if db.engine.name == 'postgresql':
-        # Produção: Usa to_char para extrair Ano-Mês
-        query = query.filter(db.func.to_char(Solicitacao.data_criacao, 'YYYY-MM') == filtro_data)
-    else:
-        # Local: Usa strftime para extrair Ano-Mês
-        query = query.filter(db.func.strftime('%Y-%m', Solicitacao.data_criacao) == filtro_data)
+from sqlalchemy import extract
 
+def aplicar_filtros_base(query, filtro_data, uvis_id):
+    """Aplica o filtro de mês/ano e opcionalmente o filtro de UVIS."""
+    
+    if filtro_data:
+        # filtro_data vem como "2026-11"
+        try:
+            ano, mes = map(int, filtro_data.split('-'))
+            
+            # Usar extract funciona tanto em SQLite quanto em Postgres de forma nativa
+            # Estamos filtrando pela data_criacao conforme seu modelo
+            query = query.filter(
+                extract('year', Solicitacao.data_criacao) == ano,
+                extract('month', Solicitacao.data_criacao) == mes
+            )
+        except Exception as e:
+            print(f"Erro ao processar filtro_data: {e}")
+
+    # Filtro de UVIS
     if uvis_id:
-        query = query.filter(Solicitacao.usuario_id == uvis_id)
-        
+        # Se for admin/operario, o uvis_id vem do request.args. 
+        # Se for uvis, vem do current_user.id
+        try:
+            query = query.filter(Solicitacao.usuario_id == int(uvis_id))
+        except (ValueError, TypeError):
+            pass
+            
     return query
 
 # --- DASHBOARD UVIS ---
@@ -541,22 +555,6 @@ from reportlab.platypus import (PageBreak, Paragraph, SimpleDocTemplate,
 # Função Auxiliar de Filtros (Reutilizada em todas as rotas)
 # =======================================================================
 
-def aplicar_filtros_base(query, filtro_data, uvis_id):
-    """Aplica o filtro de mês/ano e opcionalmente o filtro de UVIS (usuario_id)."""
-    # --- AJUSTE DE COMPATIBILIDADE PARA O RENDER (POSTGRES) ---
-    if db.engine.name == 'postgresql':
-        # No PostgreSQL usamos to_char
-        query = query.filter(db.func.to_char(Solicitacao.data_criacao, 'YYYY-MM') == filtro_data)
-    else:
-        # No SQLite (seu PC) continuamos com strftime
-        query = query.filter(db.func.strftime('%Y-%m', Solicitacao.data_criacao) == filtro_data)
-    # Filtro de UVIS (opcional)
-    if uvis_id:
-        query = query.filter(Solicitacao.usuario_id == uvis_id)
-        
-    return query
-
-
 from datetime import datetime
 
 # =======================================================================
@@ -573,35 +571,27 @@ def relatorios():
         return redirect(url_for('main.login'))
 
     try:
-        # 🔹 Parâmetros de Filtro
+        # 1. Inicialize variáveis para evitar erro de 'not defined'
+        uvis_disponiveis = []
+        
+        # 2. Busque as UVIS primeiro (se for admin)
+        if current_user.tipo_usuario in ['admin', 'operario', 'visualizar']:
+            uvis_disponiveis = (
+                db.session.query(Usuario.id, Usuario.nome_uvis)
+                .filter(Usuario.tipo_usuario == 'uvis')
+                .order_by(Usuario.nome_uvis)
+                .all()
+            )
+
+        # 3. Capture os parâmetros de Filtro
         mes_atual = request.args.get('mes', datetime.now().month, type=int)
         ano_atual = request.args.get('ano', datetime.now().year, type=int)
+        uvis_id = request.args.get('uvis_id', type=int) if current_user.tipo_usuario != 'uvis' else current_user.id
+
+        # 4. Monte a string de data para a função de filtro
         filtro_data = f"{ano_atual}-{mes_atual:02d}"
 
-        # 🔐 Controle de UVIS
-        uvis_id = current_user.id if current_user.tipo_usuario == 'uvis' \
-            else request.args.get('uvis_id', type=int)
-
-        # 🔹 UVIS disponíveis (JSON-safe)
-        uvis_disponiveis = []
-        if current_user.tipo_usuario in ['admin', 'operario', 'visualizar']:
-            uvis_disponiveis = [
-                (u.id, u.nome_uvis)
-                for u in (
-                    db.session.query(Usuario.id, Usuario.nome_uvis)
-                    .filter(Usuario.tipo_usuario == 'uvis')
-                    .order_by(Usuario.nome_uvis)
-                    .all()
-                )
-            ]
-
-        # 🔹 Compatibilidade Postgres / SQLite
-        if db.engine.name == 'postgresql':
-            func_mes = db.func.to_char(Solicitacao.data_criacao, 'YYYY-MM')
-        else:
-            func_mes = db.func.strftime('%Y-%m', Solicitacao.data_criacao)
-
-        # 🔹 Query base
+        # 5. Query base (AQUI USAMOS O EXTRACT AUTOMATICAMENTE ATRAVÉS DA FUNÇÃO)
         base_query = aplicar_filtros_base(
             db.session.query(Solicitacao),
             filtro_data,
@@ -653,20 +643,13 @@ def relatorios():
         dados_altura_voo = agrupar_por(Solicitacao.altura_voo)
 
         # =====================================================
-        # 🔹 AGRUPAMENTOS COM JOIN (JSON-safe)
+        # 🔹 AGRUPAMENTOS COM JOIN (Corrigido para usar base_query)
         # =====================================================
         dados_regiao = [
             (regiao or "Não informado", total)
             for regiao, total in (
-                aplicar_filtros_base(
-                    db.session.query(
-                        Usuario.regiao,
-                        db.func.count(Solicitacao.id)
-                    )
-                    .join(Usuario),
-                    filtro_data,
-                    uvis_id
-                )
+                base_query.join(Usuario)
+                .with_entities(Usuario.regiao, db.func.count(Solicitacao.id))
                 .group_by(Usuario.regiao)
                 .order_by(db.func.count(Solicitacao.id).desc())
                 .all()
@@ -676,16 +659,9 @@ def relatorios():
         dados_unidade = [
             (uvis or "Não informado", total)
             for uvis, total in (
-                aplicar_filtros_base(
-                    db.session.query(
-                        Usuario.nome_uvis,
-                        db.func.count(Solicitacao.id)
-                    )
-                    .join(Usuario)
-                    .filter(Usuario.tipo_usuario == 'uvis'),
-                    filtro_data,
-                    uvis_id
-                )
+                base_query.join(Usuario)
+                .filter(Usuario.tipo_usuario == 'uvis')
+                .with_entities(Usuario.nome_uvis, db.func.count(Solicitacao.id))
                 .group_by(Usuario.nome_uvis)
                 .order_by(db.func.count(Solicitacao.id).desc())
                 .all()
@@ -693,17 +669,18 @@ def relatorios():
         ]
 
         # =====================================================
-        # 🔹 HISTÓRICO MENSAL (JSON-safe)
+        # 🔹 HISTÓRICO MENSAL (Independente do filtro atual)
         # =====================================================
         dados_mensais = [
-            (mes, total)
-            for mes, total in (
+            (f"{int(ano_h):04d}-{int(mes_h):02d}", total)
+            for ano_h, mes_h, total in (
                 db.session.query(
-                    func_mes.label('mes'),
+                    extract('year', Solicitacao.data_criacao),
+                    extract('month', Solicitacao.data_criacao),
                     db.func.count(Solicitacao.id)
                 )
-                .group_by('mes')
-                .order_by('mes')
+                .group_by(extract('year', Solicitacao.data_criacao), extract('month', Solicitacao.data_criacao))
+                .order_by(extract('year', Solicitacao.data_criacao), extract('month', Solicitacao.data_criacao))
                 .all()
             )
         ]
@@ -712,6 +689,8 @@ def relatorios():
             sorted({m.split('-')[0] for m, _ in dados_mensais}, reverse=True)
             if dados_mensais else [ano_atual]
         )
+
+        print(f"DEBUG FILTRO: Mês selecionado: {mes_atual} | String gerada: {filtro_data}")
 
         return render_template(
             'relatorios.html',
@@ -732,7 +711,8 @@ def relatorios():
             ano_selecionado=ano_atual,
             anos_disponiveis=anos_disponiveis,
             uvis_id_selecionado=uvis_id,
-            uvis_disponiveis=uvis_disponiveis
+            uvis_disponiveis=uvis_disponiveis,
+            filtros={'total': total_solicitacoes}
         )
 
     except Exception as e:
@@ -744,8 +724,7 @@ def relatorios():
             titulo="Erro nos Relatórios",
             mensagem="Houve um erro técnico ao processar os dados."
         )
-
-
+    
 
 import os
 import tempfile
@@ -2311,18 +2290,24 @@ def admin_uvis_listar():
     if codigo_setor:
         query = query.filter(Usuario.codigo_setor.ilike(f"%{codigo_setor}%"))
 
+    total = query.count()
     page = request.args.get("page", 1, type=int)
     paginacao = query.order_by(Usuario.nome_uvis.asc()).paginate(
         page=page, per_page=10, error_out=False
     )
 
+    filters = {
+        "q": q,
+        "regiao": regiao,
+        "codigo_setor": codigo_setor,
+        "total": total
+    }
+
     return render_template(
         "admin_uvis_listar.html",
         uvis=paginacao.items,
         paginacao=paginacao,
-        q=q,
-        regiao=regiao,
-        codigo_setor=codigo_setor
+        filters=filters
     )
 
 @bp.route("/admin/uvis/<int:id>/editar", methods=["GET", "POST"], endpoint="admin_uvis_editar")
