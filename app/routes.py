@@ -3504,3 +3504,8 @@ def admin_uvis_exportar():
         download_name=filename,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
+
+@bp.route('/sw.js')
+def serve_sw():
+    return bp.send_static_file('sw.js')

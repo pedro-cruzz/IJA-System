@@ -22,6 +22,7 @@ body {
     transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+
 /* -----------------------------------------
    1) VARIÁVEIS GLOBAIS
    ----------------------------------------- */
@@ -1014,3 +1015,28 @@ body.dark-mode {
     transition: all 0.25s ease;
 }
 
+/* No seu arquivo CSS ou tag <style> */
+#install-container {
+    display: none; /* Escondido por padrão */
+}
+
+/* Só tenta mostrar se a tela for menor que 768px (celulares e tablets) */
+@media (max-width: 767px) {
+    /* A lógica do JavaScript ainda vai controlar o display:block, 
+       mas isso garante que no PC ele tenha menos chance de poluir o visual. */
+}
+
+@media (max-width: 991px) {
+    .navbar-nav {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+    #install-container {
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        padding-bottom: 1rem;
+        margin-bottom: 1rem;
+    }
+    .w-100-mobile {
+        width: 100% !important;
+    }
+}
