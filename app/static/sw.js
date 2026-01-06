@@ -4,7 +4,7 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-    // O Chrome exige que o evento responda com o fetch real 
-    // para validar a instalação do PWA.
+
     event.respondWith(fetch(event.request));
-});
+});self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));

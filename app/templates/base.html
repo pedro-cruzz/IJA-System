@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IJA System</title>
 
+    <!-- ✅ FIX JINJA: concatenação com ~ -->
+
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}" />
     <meta name="theme-color" content="#0d6efd" />
     <meta name="mobile-web-app-capable" content="yes">
@@ -14,7 +16,7 @@
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/icon-192.png') }}" />
 
     <link rel="icon" type="image/png"
-        href="{{ url_for('static', filename='img/logo_IJA_System_' + (tema_escolhido if tema_escolhido else 'light') + '.png') }}" />
+        href="{{ url_for('static', filename='img/logo_IJA_System_' ~ (tema_escolhido if tema_escolhido else 'light') ~ '.png') }}" />
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet" />
@@ -34,6 +36,19 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
+    <!-- ✅ PWA (Instalar como app) -->
+    <link
+      rel="manifest"
+      href="{{ url_for('static', filename='manifest.webmanifest') }}"
+    />
+    <meta name="theme-color" content="#101927" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+
+    <!-- ✅ CSS do submenu (Clientes) + footer da sidebar -->
     <style>
         .app-sidebar .nav-link-toggle {
             background: transparent;
@@ -88,6 +103,15 @@
                 border-bottom-color: rgba(255, 255, 255, 0.1);
             }
         }
+
+      /* ✅ rodapé no pé da sidebar */
+      .sidebar-footer {
+        padding: 0.75rem 0.5rem 1rem;
+        border-top: 1px solid rgba(0, 0, 0, 0.06);
+      }
+      .dark-mode .sidebar-footer {
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
     </style>
 </head>
 
@@ -154,8 +178,10 @@
 
     {% if current_user.is_authenticated %}
     <div class="app-wrapper">
-        <div class="app-sidebar" id="appSidebar">
-            <ul class="nav flex-column">
+        <!-- ✅ vira flex-column pra ter "pé" fixo -->
+      <div class="app-sidebar d-flex flex-column" id="appSidebar">
+            <!-- ✅ nav ocupa o espaço e empurra o footer pra baixo -->
+        <ul class="nav flex-column flex-grow-1">
                 <li class="nav-item">
                     <a class="nav-link {% if request.endpoint == 'main.dashboard' %}active{% endif %}"
                         href="{{ url_for('main.dashboard') }}">
@@ -232,7 +258,30 @@
                 </li>
                 {% endif %}
             </ul>
+  
+        <!-- ✅ PÉ DA SIDEBAR: aparece SEMPRE -->
+        <div class="sidebar-footer mt-auto">
+          <!-- 🔥 NOVO: Abrir app (aparece quando já está instalado) -->
+          <a class="nav-link" href="#" id="openAppLink" style="display: none">
+            <i class="bi bi-box-arrow-up-right me-2"></i><span>Abrir app</span>
+          </a>
+
+          <!-- Baixar app (aparece quando NÃO está instalado) -->
+          <a
+            class="nav-link"
+            href="#"
+            id="installAppLink"
+            style="display: none"
+          >
+            <i class="bi bi-download me-2"></i><span>Baixar app</span>
+          </a>
+
+          <!-- iOS instruções -->
+          <a class="nav-link" href="#" id="installAppIOS" style="display: none">
+            <i class="bi bi-phone me-2"></i><span>Instalar no iPhone</span>
+          </a>
         </div>
+      </div>
 
         <div class="app-content" id="appContent">
             <div class="container-fluid min-vh-100">
@@ -266,10 +315,20 @@
             document.cookie = `theme=${themeName}; expires=${date.toUTCString()}; path=/; SameSite=Lax`;
         }
 
-        function getThemeFromCookie() {
-            const theme = document.cookie.match(/theme=([^;]+)/);
-            return theme ? theme[1] : null;
-        }
+      function getThemeFromCookie() {
+        const theme = document.cookie.match(/theme=([^;]+)/);
+        return theme ? theme[1] : null;
+      }
+
+      // ====================================================================
+      // FUNÇÕES GLOBAIS DE CARREGAMENTO (LOADING STATE)
+      // ====================================================================
+      function hideLoadingState(button) {
+        if (!button || !button.originalText) return;
+        button.disabled = false;
+        button.innerHTML = button.originalText;
+        delete button.originalText;
+      }
 
         function showLoadingState(button) {
             if (!button) return;
@@ -278,10 +337,10 @@
             button.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Aguarde...`;
         }
 
-        document.addEventListener("DOMContentLoaded", () => {
-            const body = document.body;
-            const toggle = document.getElementById("toggleDarkMode");
-            const sidebarToggle = document.getElementById("sidebarToggle");
+      document.addEventListener("DOMContentLoaded", () => {
+        const body = document.body;
+        const toggle = document.getElementById("toggleDarkMode");
+        const sidebarToggle = document.getElementById("sidebarToggle");
 
             // Flash Messages
             {% set flashed = get_flashed_messages(with_categories = true) %}
