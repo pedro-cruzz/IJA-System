@@ -1,191 +1,257 @@
 <!DOCTYPE html>
 <html lang="pt-br" class="{% if tema_escolhido == 'dark' %}dark-mode{% endif %}">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IJA System</title>
-    
+
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}" />
     <meta name="theme-color" content="#0d6efd" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="IJA System" />
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/icon-192.png') }}" />
 
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo_IJA_System_' + (tema_escolhido if tema_escolhido else 'light') + '.png') }}" />
+    <link rel="icon" type="image/png"
+        href="{{ url_for('static', filename='img/logo_IJA_System_' + (tema_escolhido if tema_escolhido else 'light') + '.png') }}" />
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet" />
 
     <script>
-      (function () {
-        const theme = document.cookie.match(/theme=([^;]+)/);
-        if (theme && theme[1] === "dark") {
-          document.documentElement.classList.add("dark-mode");
-          document.documentElement.style.backgroundColor = "#101927";
-        }
-      })();
+        (function () {
+            const theme = document.cookie.match(/theme=([^;]+)/);
+            if (theme && theme[1] === "dark") {
+                document.documentElement.classList.add("dark-mode");
+                document.documentElement.style.backgroundColor = "#101927";
+            }
+        })();
     </script>
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
     <style>
-      .app-sidebar .nav-link-toggle { background: transparent; border: 0; text-align: left; width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.75rem; border-radius: 14px; }
-      .app-sidebar .nav-link-toggle:hover { background: rgba(0, 0, 0, 0.05); }
-      .dark-mode .app-sidebar .nav-link-toggle:hover { background: rgba(255, 255, 255, 0.06); }
-      .app-sidebar .nav-link-toggle .chevron { transition: transform 0.2s ease; opacity: 0.85; }
-      .app-sidebar .nav-link-toggle[aria-expanded="true"] .chevron { transform: rotate(180deg); }
-      .app-sidebar .sub-nav { margin: 0.25rem 0 0.5rem; padding-left: 1.8rem; }
-      .app-sidebar .sub-link { padding: 0.45rem 0.75rem; border-radius: 12px; font-size: 0.93rem; opacity: 0.95; }
-      
-      /* Ajuste responsivo para o botão de instalar no menu mobile */
-      @media (max-width: 991px) {
-        #install-container {
-          border-bottom: 1px solid rgba(0,0,0,0.1);
-          margin-bottom: 1rem;
-          padding-bottom: 1rem;
+        .app-sidebar .nav-link-toggle {
+            background: transparent;
+            border: 0;
+            text-align: left;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 0.75rem;
+            border-radius: 14px;
         }
-        .dark-mode #install-container { border-bottom-color: rgba(255,255,255,0.1); }
-      }
+
+        .app-sidebar .nav-link-toggle:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .dark-mode .app-sidebar .nav-link-toggle:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .app-sidebar .nav-link-toggle .chevron {
+            transition: transform 0.2s ease;
+            opacity: 0.85;
+        }
+
+        .app-sidebar .nav-link-toggle[aria-expanded="true"] .chevron {
+            transform: rotate(180deg);
+        }
+
+        .app-sidebar .sub-nav {
+            margin: 0.25rem 0 0.5rem;
+            padding-left: 1.8rem;
+        }
+
+        .app-sidebar .sub-link {
+            padding: 0.45rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.93rem;
+            opacity: 0.95;
+        }
+
+        /* Ajuste responsivo para o botão de instalar no menu mobile */
+        @media (max-width: 991px) {
+            #install-container {
+                border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+                margin-bottom: 1rem;
+                padding-bottom: 1rem;
+            }
+
+            .dark-mode #install-container {
+                border-bottom-color: rgba(255, 255, 255, 0.1);
+            }
+        }
     </style>
 </head>
 
 <body>
     <nav class="navbar navbar-expand-lg navbar-light fixed-top shadow-sm">
-      <div class="container-fluid">
-        {% if current_user and current_user.is_authenticated %}
-        <button class="btn btn-outline-primary me-3 d-none d-lg-block" type="button" id="sidebarToggle" aria-label="Toggle Sidebar">
-          <i class="bi bi-list fs-5"></i>
-        </button>
-        {% endif %}
-
-        <a class="navbar-brand d-flex align-items-center gap-3" href="{{ url_for('main.dashboard') }}">
-          <img src="{{ url_for('static', filename='img/logo_IJA_System_light.png') }}" class="navbar-logo logo-light" alt="IJA System" />
-          <img src="{{ url_for('static', filename='img/logo_IJA_System_dark.png') }}" class="navbar-logo logo-dark" alt="IJA System" />
-          <span class="fs-4">IJA System</span>
-        </a>
-
-        <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-
-        <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
-          <ul class="navbar-nav align-items-center gap-3">
-            
-            <li class="nav-item w-100 d-lg-none" id="install-container" style="display: none;">
-              <button id="btnInstall" class="btn btn-primary w-100 rounded-pill">
-                <i class="bi bi-download me-2"></i> Instalar App IJA
-              </button>
-            </li>
-
-            {% if current_user.is_authenticated %}
-            <li class="nav-item">
-              <span class="nav-link fw-bold">
-                <i class="bi bi-person-circle me-1"></i> Olá, <strong>{{ current_user.nome_uvis or current_user.name }}</strong>
-              </span>
-            </li>
+        <div class="container-fluid">
+            {% if current_user and current_user.is_authenticated %}
+            <button class="btn btn-outline-primary me-3 d-none d-lg-block" type="button" id="sidebarToggle"
+                aria-label="Toggle Sidebar">
+                <i class="bi bi-list fs-5"></i>
+            </button>
             {% endif %}
 
-            <li class="nav-item">
-              <button id="toggleDarkMode" class="btn btn-outline-light btn-sm rounded-pill" aria-label="Alternar tema">
-                <i class="bi bi-moon-stars"></i>
-              </button>
-            </li>
+            <a class="navbar-brand d-flex align-items-center gap-3" href="{{ url_for('main.dashboard') }}">
+                <img src="{{ url_for('static', filename='img/logo_IJA_System_light.png') }}"
+                    class="navbar-logo logo-light" alt="IJA System" />
+                <img src="{{ url_for('static', filename='img/logo_IJA_System_dark.png') }}" class="navbar-logo logo-dark"
+                    alt="IJA System" />
+                <span class="fs-4">IJA System</span>
+            </a>
 
-            {% if current_user.is_authenticated %}
-            <li class="nav-item border-start ps-3 d-none d-lg-block"></li>
-            <li class="nav-item">
-              <a class="btn btn-outline-light btn-sm rounded-pill px-3 fw-bold" href="{{ url_for('main.logout') }}">
-                Sair <i class="bi bi-box-arrow-right ms-1"></i>
-              </a>
-            </li>
-            {% endif %}
-          </ul>
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+                <ul class="navbar-nav align-items-center gap-3">
+
+                    <li class="nav-item w-100 d-lg-none" id="install-container" style="display: none;">
+                        <button id="btnInstall" class="btn btn-primary w-100 rounded-pill">
+                            <i class="bi bi-download me-2"></i> Instalar App IJA
+                        </button>
+                    </li>
+
+                    {% if current_user.is_authenticated %}
+                    <li class="nav-item">
+                        <span class="nav-link fw-bold">
+                            <i class="bi bi-person-circle me-1"></i> Olá, <strong>{{ current_user.nome_uvis or
+                                current_user.name }}</strong>
+                        </span>
+                    </li>
+                    {% endif %}
+
+                    <li class="nav-item">
+                        <button id="toggleDarkMode" class="btn btn-outline-light btn-sm rounded-pill"
+                            aria-label="Alternar tema">
+                            <i class="bi bi-moon-stars"></i>
+                        </button>
+                    </li>
+
+                    {% if current_user.is_authenticated %}
+                    <li class="nav-item border-start ps-3 d-none d-lg-block"></li>
+                    <li class="nav-item">
+                        <a class="btn btn-outline-light btn-sm rounded-pill px-3 fw-bold"
+                            href="{{ url_for('main.logout') }}">
+                            Sair <i class="bi bi-box-arrow-right ms-1"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
         </div>
-      </div>
     </nav>
 
     {% if current_user.is_authenticated %}
     <div class="app-wrapper">
-      <div class="app-sidebar" id="appSidebar">
-        <ul class="nav flex-column">
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint == 'main.dashboard' %}active{% endif %}" href="{{ url_for('main.dashboard') }}">
-              <i class="bi bi-grid-fill me-2"></i><span>Dashboard</span>
-            </a>
-          </li>
+        <div class="app-sidebar" id="appSidebar">
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'main.dashboard' %}active{% endif %}"
+                        href="{{ url_for('main.dashboard') }}">
+                        <i class="bi bi-grid-fill me-2"></i><span>Dashboard</span>
+                    </a>
+                </li>
 
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint == 'main.notificacoes' %}active{% endif %}" href="{{ url_for('main.notificacoes') }}">
-              <i class="bi bi-bell-fill me-2"></i><span>Notificações</span>
-              {% if notif_count and notif_count > 0 %}
-              <span class="badge bg-danger ms-auto" style="border-radius: 999px">{{ notif_count }}</span>
-              {% endif %}
-            </a>
-          </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'main.notificacoes' %}active{% endif %}"
+                        href="{{ url_for('main.notificacoes') }}">
+                        <i class="bi bi-bell-fill me-2"></i><span>Notificações</span>
+                        {% if notif_count and notif_count > 0 %}
+                        <span class="badge bg-danger ms-auto" style="border-radius: 999px">{{ notif_count }}</span>
+                        {% endif %}
+                    </a>
+                </li>
 
-          {% if current_user.tipo_usuario == 'admin' %}
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint == 'main.relatorios' %}active{% endif %}" href="{{ url_for('main.relatorios') }}">
-              <i class="bi bi-bar-chart-fill me-2"></i><span>Relatórios</span>
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.endpoint == 'main.agenda' %}active{% endif %}" href="{{ url_for('main.agenda') }}">
-              <i class="bi bi-calendar-event-fill me-2"></i><span>Agenda</span>
-            </a>
-          </li>
+                {% if current_user.tipo_usuario == 'admin' %}
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'main.relatorios' %}active{% endif %}"
+                        href="{{ url_for('main.relatorios') }}">
+                        <i class="bi bi-bar-chart-fill me-2"></i><span>Relatórios</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'main.agenda' %}active{% endif %}"
+                        href="{{ url_for('main.agenda') }}">
+                        <i class="bi bi-calendar-event-fill me-2"></i><span>Agenda</span>
+                    </a>
+                </li>
 
-          {% set uvis_active = request.endpoint in ['main.admin_uvis_listar', 'main.admin_uvis_novo'] %}
-          <li class="nav-item">
-            <button type="button" class="nav-link nav-link-toggle {% if uvis_active %}active{% endif %}" data-bs-toggle="collapse" data-bs-target="#menuUvis" aria-expanded="{{ 'true' if uvis_active else 'false' }}">
-              <span><i class="bi bi-buildings-fill me-2"></i><span>UVIS</span></span>
-              <i class="bi bi-chevron-down chevron"></i>
-            </button>
-            <div class="collapse {% if uvis_active %}show{% endif %}" id="menuUvis">
-              <ul class="nav flex-column sub-nav">
-                <li class="nav-item"><a class="nav-link sub-link {% if request.endpoint == 'main.admin_uvis_listar' %}active{% endif %}" href="{{ url_for('main.admin_uvis_listar') }}"><i class="bi bi-list-ul me-2"></i><span>Listar</span></a></li>
-                <li class="nav-item"><a class="nav-link sub-link {% if request.endpoint == 'main.admin_uvis_novo' %}active{% endif %}" href="{{ url_for('main.admin_uvis_novo') }}"><i class="bi bi-person-plus-fill me-2"></i><span>Cadastrar</span></a></li>
-              </ul>
-            </div>
-          </li>
+                {% set uvis_active = request.endpoint in ['main.admin_uvis_listar', 'main.admin_uvis_novo'] %}
+                <li class="nav-item">
+                    <button type="button" class="nav-link nav-link-toggle {% if uvis_active %}active{% endif %}"
+                        data-bs-toggle="collapse" data-bs-target="#menuUvis"
+                        aria-expanded="{{ 'true' if uvis_active else 'false' }}">
+                        <span><i class="bi bi-buildings-fill me-2"></i><span>UVIS</span></span>
+                        <i class="bi bi-chevron-down chevron"></i>
+                    </button>
+                    <div class="collapse {% if uvis_active %}show{% endif %}" id="menuUvis">
+                        <ul class="nav flex-column sub-nav">
+                            <li class="nav-item"><a
+                                    class="nav-link sub-link {% if request.endpoint == 'main.admin_uvis_listar' %}active{% endif %}"
+                                    href="{{ url_for('main.admin_uvis_listar') }}"><i
+                                        class="bi bi-list-ul me-2"></i><span>Listar</span></a></li>
+                            <li class="nav-item"><a
+                                    class="nav-link sub-link {% if request.endpoint == 'main.admin_uvis_novo' %}active{% endif %}"
+                                    href="{{ url_for('main.admin_uvis_novo') }}"><i
+                                        class="bi bi-person-plus-fill me-2"></i><span>Cadastrar</span></a></li>
+                        </ul>
+                    </div>
+                </li>
 
-          {% set clientes_active = request.endpoint in ['main.listar_clientes', 'main.cadastrar_clientes'] %}
-          <li class="nav-item">
-            <button type="button" class="nav-link nav-link-toggle {% if clientes_active %}active{% endif %}" data-bs-toggle="collapse" data-bs-target="#menuClientes" aria-expanded="{{ 'true' if clientes_active else 'false' }}">
-              <span><i class="bi bi-people-fill me-2"></i><span>Clientes</span></span>
-              <i class="bi bi-chevron-down chevron"></i>
-            </button>
-            <div class="collapse {% if clientes_active %}show{% endif %}" id="menuClientes">
-              <ul class="nav flex-column sub-nav">
-                <li class="nav-item"><a class="nav-link sub-link {% if request.endpoint == 'main.listar_clientes' %}active{% endif %}" href="{{ url_for('main.listar_clientes') }}"><i class="bi bi-list-ul me-2"></i><span>Listar</span></a></li>
-                <li class="nav-item"><a class="nav-link sub-link {% if request.endpoint == 'main.cadastrar_clientes' %}active{% endif %}" href="{{ url_for('main.cadastrar_clientes') }}"><i class="bi bi-person-plus-fill me-2"></i><span>Cadastrar</span></a></li>
-              </ul>
-            </div>
-          </li>
-          {% endif %}
-        </ul>
-      </div>
-
-      <div class="app-content" id="appContent">
-        <div class="container-fluid min-vh-100">
-          {% block content %}{% endblock %}
+                {% set clientes_active = request.endpoint in ['main.listar_clientes', 'main.cadastrar_clientes'] %}
+                <li class="nav-item">
+                    <button type="button" class="nav-link nav-link-toggle {% if clientes_active %}active{% endif %}"
+                        data-bs-toggle="collapse" data-bs-target="#menuClientes"
+                        aria-expanded="{{ 'true' if clientes_active else 'false' }}">
+                        <span><i class="bi bi-people-fill me-2"></i><span>Clientes</span></span>
+                        <i class="bi bi-chevron-down chevron"></i>
+                    </button>
+                    <div class="collapse {% if clientes_active %}show{% endif %}" id="menuClientes">
+                        <ul class="nav flex-column sub-nav">
+                            <li class="nav-item"><a
+                                    class="nav-link sub-link {% if request.endpoint == 'main.listar_clientes' %}active{% endif %}"
+                                    href="{{ url_for('main.listar_clientes') }}"><i
+                                        class="bi bi-list-ul me-2"></i><span>Listar</span></a></li>
+                            <li class="nav-item"><a
+                                    class="nav-link sub-link {% if request.endpoint == 'main.cadastrar_clientes' %}active{% endif %}"
+                                    href="{{ url_for('main.cadastrar_clientes') }}"><i
+                                        class="bi bi-person-plus-fill me-2"></i><span>Cadastrar</span></a></li>
+                        </ul>
+                    </div>
+                </li>
+                {% endif %}
+            </ul>
         </div>
-        <footer class="main-footer py-3 mt-4">
-          <div class="container-fluid text-center">
-            <p class="mb-0 small text-muted">&copy; 2025 <span class="fw-bold">IJA drones</span>. Todos os direitos reservados.</p>
-          </div>
-        </footer>
-      </div>
+
+        <div class="app-content" id="appContent">
+            <div class="container-fluid min-vh-100">
+                {% block content %}{% endblock %}
+            </div>
+            <footer class="main-footer py-3 mt-4">
+                <div class="container-fluid text-center">
+                    <p class="mb-0 small text-muted">&copy; 2025 <span class="fw-bold">IJA drones</span>. Todos os
+                        direitos reservados.</p>
+                </div>
+            </footer>
+        </div>
     </div>
     {% else %}
     <div class="container py-4">
-      {% block auth_content %}{% endblock %}
-      <footer class="text-center py-4">
-        <p class="small text-muted">&copy; 2025 <strong>IJA drones</strong></p>
-      </footer>
+        {% block auth_content %}{% endblock %}
+        <footer class="text-center py-4">
+            <p class="small text-muted">&copy; 2025 <strong>IJA drones</strong></p>
+        </footer>
     </div>
     {% endif %}
 
@@ -193,93 +259,96 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
-      // Lógica de Temas e Cookies
-      function setThemeCookie(themeName) {
-        const date = new Date();
-        date.setTime(date.getTime() + 365 * 24 * 60 * 60 * 1000);
-        document.cookie = `theme=${themeName}; expires=${date.toUTCString()}; path=/; SameSite=Lax`;
-      }
+        // Lógica de Temas e Cookies
+        function setThemeCookie(themeName) {
+            const date = new Date();
+            date.setTime(date.getTime() + 365 * 24 * 60 * 60 * 1000);
+            document.cookie = `theme=${themeName}; expires=${date.toUTCString()}; path=/; SameSite=Lax`;
+        }
 
-      function getThemeFromCookie() {
-        const theme = document.cookie.match(/theme=([^;]+)/);
-        return theme ? theme[1] : null;
-      }
+        function getThemeFromCookie() {
+            const theme = document.cookie.match(/theme=([^;]+)/);
+            return theme ? theme[1] : null;
+        }
 
-      function showLoadingState(button) {
-        if (!button) return;
-        button.originalText = button.innerHTML;
-        button.disabled = true;
-        button.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Aguarde...`;
-      }
+        function showLoadingState(button) {
+            if (!button) return;
+            button.originalText = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Aguarde...`;
+        }
 
-      document.addEventListener("DOMContentLoaded", () => {
-        const body = document.body;
-        const toggle = document.getElementById("toggleDarkMode");
-        const sidebarToggle = document.getElementById("sidebarToggle");
+        document.addEventListener("DOMContentLoaded", () => {
+            const body = document.body;
+            const toggle = document.getElementById("toggleDarkMode");
+            const sidebarToggle = document.getElementById("sidebarToggle");
 
-        // Flash Messages
-        {% set flashed = get_flashed_messages(with_categories=true) %}
-        {% if flashed %}
-          {% for category, message in flashed %}
+            // Flash Messages
+            {% set flashed = get_flashed_messages(with_categories = true) %}
+            {% if flashed %}
+            {% for category, message in flashed %}
             const isDarkMode = body.classList.contains('dark-mode');
             Swal.fire({
-              toast: true, position: 'top-end', icon: "{% if category == 'success' %}success{% elif category in ['danger','error'] %}error{% else %}info{% endif %}",
-              title: {{ message|tojson }}, showConfirmButton: false, timer: 3000,
-              background: isDarkMode ? '#152233' : '#fff', color: isDarkMode ? '#ffffff' : '#545454'
+                toast: true, position: 'top-end', icon: "{% if category == 'success' %}success{% elif category in ['danger','error'] %}error{% else %}info{% endif %}",
+                title: {{ message | tojson }}, showConfirmButton: false, timer: 3000,
+                background: isDarkMode ? '#152233' : '#fff', color: isDarkMode ? '#ffffff' : '#545454'
             });
-          {% endfor %}
-        {% endif %}
+            {% endfor %}
+            {% endif %}
 
-        // Sidebar Toggle
-        if (sidebarToggle) sidebarToggle.addEventListener("click", () => body.classList.toggle("sidebar-collapsed"));
+            // Sidebar Toggle
+            if (sidebarToggle) sidebarToggle.addEventListener("click", () => body.classList.toggle("sidebar-collapsed"));
 
-        // Dark Mode Toggle
-        if (toggle) {
-          const savedTheme = getThemeFromCookie();
-          if (savedTheme === "dark") {
-            body.classList.add("dark-mode");
-            toggle.innerHTML = '<i class="bi bi-sun-fill"></i>';
-          }
-          toggle.addEventListener("click", () => {
-            body.classList.toggle("dark-mode");
-            const isDark = body.classList.contains("dark-mode");
-            setThemeCookie(isDark ? "dark" : "light");
-            toggle.innerHTML = isDark ? '<i class="bi bi-sun-fill"></i>' : '<i class="bi bi-moon-stars"></i>';
-          });
-        }
+            // Dark Mode Toggle
+            if (toggle) {
+                const savedTheme = getThemeFromCookie();
+                if (savedTheme === "dark") {
+                    body.classList.add("dark-mode");
+                    toggle.innerHTML = '<i class="bi bi-sun-fill"></i>';
+                }
+                toggle.addEventListener("click", () => {
+                    body.classList.toggle("dark-mode");
+                    const isDark = body.classList.contains("dark-mode");
+                    setThemeCookie(isDark ? "dark" : "light");
+                    toggle.innerHTML = isDark ? '<i class="bi bi-sun-fill"></i>' : '<i class="bi bi-moon-stars"></i>';
+                });
+            }
 
-        navigator.serviceWorker.register("/sw.js");
+            let deferredPrompt;
+            const installContainer = document.getElementById('install-container');
+            const btnInstall = document.getElementById('btnInstall');
 
-        let deferredPrompt;
-        const installContainer = document.getElementById('install-container');
-        const btnInstall = document.getElementById('btnInstall');
+            window.addEventListener('beforeinstallprompt', (e) => {
+                console.log('✅ PWA detectado pelo navegador!'); // Log para conferir no console
+                e.preventDefault();
+                deferredPrompt = e;
 
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            installContainer.style.display = 'block';
+                // Mostra o container apenas se ele existir no DOM
+                if (installContainer) {
+                    installContainer.style.setProperty('display', 'block', 'important');
+                }
 
-            btnInstall.addEventListener('click', async () => {
-                installContainer.style.display = 'none';
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                deferredPrompt = null;
+                if (btnInstall) {
+                    btnInstall.addEventListener('click', async () => {
+                        installContainer.style.display = 'none';
+                        deferredPrompt.prompt();
+                        const { outcome } = await deferredPrompt.userChoice;
+                        console.log(`Usuário escolheu: ${outcome}`);
+                        deferredPrompt = null;
+                    });
+                }
             });
         });
-
-        window.addEventListener('appinstalled', () => {
-            installContainer.style.display = 'none';
-        });
-
-        // iOS Detection
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-        if (isIOS && !isStandalone) {
-            console.log("Dica iOS: Use o menu de compartilhar para instalar.");
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register("/sw.js")
+                .then(() => console.log("✅ Service Worker registrado!"))
+                .catch(err => console.log("❌ Erro ao registrar SW:", err));
+        } else {
+            console.log("⚠️ Service Worker não suportado (Verifique se está usando HTTPS)");
         }
-      });
     </script>
 
     {% block scripts %}{% endblock %}
 </body>
+
 </html>

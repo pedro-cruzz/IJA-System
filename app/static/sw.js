@@ -4,5 +4,7 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-    // Necessário para habilitar o PWA no Chrome Mobile
+    // O Chrome exige que o evento responda com o fetch real 
+    // para validar a instalação do PWA.
+    event.respondWith(fetch(event.request));
 });
