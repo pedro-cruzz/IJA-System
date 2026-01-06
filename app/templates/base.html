@@ -339,6 +339,29 @@
                 }
             });
         });
+
+        // Detecta se é iOS (iPhone/iPad)
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+        // Verifica se já está aberto como "App" instalado
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+
+        if (isIOS && !isStandalone) {
+            // Aqui você pode disparar um alerta do SweetAlert que você já usa no projeto
+            console.log("Dica para iPhone detectada");
+            
+            // Exemplo: mostrar um pequeno aviso após 3 segundos
+            setTimeout(() => {
+                Swal.fire({
+                    title: 'Instale o App no seu iPhone',
+                    text: 'Toque no ícone de compartilhar (seta para cima) e selecione "Adicionar à Tela de Início" para usar o sistema em tela cheia.',
+                    icon: 'info',
+                    confirmButtonText: 'Entendi',
+                    background: document.body.classList.contains('dark-mode') ? '#152233' : '#fff',
+                    color: document.body.classList.contains('dark-mode') ? '#ffffff' : '#545454'
+                });
+            }, 3000);
+        }
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register("/sw.js")
                 .then(() => console.log("✅ Service Worker registrado!"))
