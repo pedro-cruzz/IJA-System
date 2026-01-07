@@ -2,6 +2,59 @@
    DESIGN SYSTEM - OCEANO AZUL
    ========================================= */
 
+
+  :root {
+  --navbar-offset: 64px; /* fallback */
+}
+
+/* 🔒 TRAVA O BODY (obrigatório no iOS) */
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* ✅ Navbar fixa */
+.navbar.fixed-top {
+  position: fixed;
+  top: env(safe-area-inset-top, 0px);
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 1030;
+}
+
+/* ✅ Wrapper principal */
+.app-wrapper {
+  height: 100%;
+  display: flex;
+}
+
+/* ✅ CONTEÚDO COM SCROLL (não o body) */
+.app-content {
+  flex: 1;
+  margin-top: calc(
+    var(--navbar-offset) + env(safe-area-inset-top, 0px)
+  );
+
+  height: calc(
+    100dvh - var(--navbar-offset) - env(safe-area-inset-top, 0px)
+  );
+
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ❌ NUNCA use vh/svh aqui */
+.app-content > .container-fluid {
+  min-height: unset !important;
+}
+
+ 
 /* -----------------------------------------
    DARK COOKIE (Prioridade Máxima)
    ----------------------------------------- */
@@ -16,6 +69,10 @@ html.dark-mode {
    1) VARIÁVEIS GLOBAIS
    ----------------------------------------- */
 :root {
+
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
+
   /* Cores Principais */
   --color-primary-dark: #1a4a7c;
   --color-primary: #2c5282;
@@ -64,6 +121,8 @@ html.dark-mode {
    2) RESET, TIPOGRAFIA E LINKS
    ----------------------------------------- */
 body {
+   padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
   margin: 0;
   background: var(--color-bg-body);
   font-family: "Poppins", sans-serif;
@@ -122,6 +181,11 @@ a:hover {
   border-bottom: 1px solid transparent;
   min-height: var(--navbar-height);
 }
+
+.navbar.fixed-top {
+  padding-top: calc(0.75rem + var(--safe-top));
+}
+
 
 .navbar-brand {
   display: flex;
@@ -1045,6 +1109,19 @@ body.dark-mode .page-item.disabled .page-link {
       border-radius: 50%;
   }
 }
+
+/* ✅ Navbar collapse bem escopado */
+@media (max-width: 991.98px) {
+  .navbar .navbar-collapse {
+    display: none !important;
+  }
+}
+
+@media (min-width: 992px) {
+  .navbar .navbar-collapse {
+    display: flex !important;
+  }
+}
 /* =========================================
    DASHBOARD DESKTOP – AJUSTE DE COLUNAS
    ========================================= */
@@ -1176,3 +1253,58 @@ body.dark-mode .page-item.disabled .page-link {
 
 .btn-action-icon.danger { color: #dc3545; }
 .btn-action-icon.danger:hover { background-color: #f8d7da; }
+
+/* =========================================================
+   FORM CONTROLS – PADRÃO VISUAL DO SISTEMA
+   ========================================================= */
+
+/* Labels */
+label,
+.form-label {
+  font-weight: 500;
+  border-radius: 10px;
+}
+
+/* Inputs, selects e textareas */
+.form-control,
+.form-select {
+  border-radius: 12px;
+  font-size: 0.85rem;
+  padding: 0.45rem 0.75rem;
+
+  border: 1px solid #dee2e6;
+  box-shadow: none;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+/* Versão small */
+.form-control-sm,
+.form-select-sm {
+  border-radius: 10px;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.65rem;
+}
+
+/* Focus (padrão elegante, sem exagero) */
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15);
+}
+
+/* Placeholder */
+.form-control::placeholder {
+  color: #adb5bd;
+  font-size: 0.8rem;
+}
+
+/* Remove aparência quadrada em browsers estranhos */
+input,
+select,
+textarea {
+  border-radius: inherit;
+}
+

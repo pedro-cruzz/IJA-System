@@ -67,22 +67,25 @@
         --navbar-offset: 64px; /* fallback */
       }
 
-      html,
-      body {
-        margin: 0 !important;
-        padding: 0 !important;
+      body{
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
       }
 
-      /* Navbar fixa normal */
+      html,
+      body {
+        margin: 0 ;
+        padding: 0;
+      }
+
       .navbar.fixed-top {
         position: fixed !important;
-        top: 0 !important; /* ✅ tira env aqui */
+        top: 0 !important;
         left: 0 !important;
         right: 0 !important;
         width: 100% !important;
         z-index: 1030 !important;
-        margin: 0 !important;
-        transform: none !important;
       }
 
       /* ✅ offset do conteúdo (inclui safe-area só aqui) */
@@ -333,7 +336,7 @@
       </div>
 
       <div class="app-content" id="appContent">
-        <div class="container-fluid min-vh-100">
+        <div class="container-fluid">
           {% block content %}{% endblock %}
         </div>
         <footer class="main-footer py-3 mt-4">

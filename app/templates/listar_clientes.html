@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block extra_styles %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/buttons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/tables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/forms.css') }}"> 
 {% endblock %}
 {% block content %}
 
@@ -255,44 +257,89 @@
         </div>
     </div>
 
-    <form method="GET" action="{{ url_for('main.listar_clientes') }}" class="card p-3 mb-4 shadow-sm rounded-4 border-0">
-        <div class="row g-2 align-items-end">
-            <div class="col-md-4">
-                <label class="small text-muted mb-1">Busca geral:</label>
-                <input type="text" class="form-control form-control-sm" name="q" value="{{ filters.q }}" placeholder="Nome, e-mail, contato...">
-            </div>
+{# --- FILTROS EM SANFONA (CLIENTES) --- #}
+<div class="card shadow-sm rounded-4 mb-4 border-0"
+     data-bs-toggle="collapse"
+     data-bs-target="#collapseFiltrosClientes"
+     style="cursor: pointer;">
 
-            <div class="col-md-2">
-                <label class="small text-muted mb-1">CPF/CNPJ:</label>
-                <input type="text" class="form-control form-control-sm" name="doc" value="{{ filters.doc }}" placeholder="Somente números">
-            </div>
+    {# HEADER DA SANFONA #}
+    <div class="card-header border-0 p-3 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-funnel-fill text-primary"></i>
+            <span class="text-dark">Filtros de Busca</span>
 
-            <div class="col-md-2">
-                <label class="small text-muted mb-1">E-mail:</label>
-                <input type="text" class="form-control form-control-sm" name="email" value="{{ filters.email }}" placeholder="ex@gmail.com">
-            </div>
-
-            <div class="col-md-2">
-                <label class="small text-muted mb-1">Ordenar:</label>
-                <select class="form-select form-select-sm" name="sort">
-                    <option value="nome_asc" {% if filters.sort == 'nome_asc' %}selected{% endif %}>Nome (A→Z)</option>
-                    <option value="nome_desc" {% if filters.sort == 'nome_desc' %}selected{% endif %}>Nome (Z→A)</option>
-                    <option value="id_desc" {% if filters.sort == 'id_desc' %}selected{% endif %}>Mais recentes</option>
-                </select>
-            </div>
-
-            <div class="col-md-2 d-flex gap-2">
-                <button type="submit" class="btn btn-success btn-sm w-100">
-                    <i class="bi bi-funnel"></i> Filtrar
-                </button>
-                {% if filters.q or filters.doc or filters.email %}
-                <a href="{{ url_for('main.listar_clientes') }}" class="btn btn-outline-secondary btn-sm w-100">
-                    <i class="bi bi-x-lg"></i> Limpar
-                </a>
-                {% endif %}
-            </div>
+            {% if filters.q or filters.doc or filters.email %}
+                <span class="badge bg-danger rounded-circle p-1"
+                      style="width: 8px; height: 8px;"></span>
+            {% endif %}
         </div>
-    </form>
+        <i class="bi bi-chevron-down text-muted"></i>
+    </div>
+
+    {# CORPO DA SANFONA #}
+    <div class="collapse {% if filters.q or filters.doc or filters.email %}show{% endif %}"
+         id="collapseFiltrosClientes">
+
+        <div class="card-body pt-0">
+            <form method="GET" action="{{ url_for('main.listar_clientes') }}">
+                <div class="row g-2 align-items-end">
+
+                    <div class="col-md-4">
+                        <label class="small text-muted mb-1">Busca geral:</label>
+                        <input type="text"
+                               class="form-control form-control-sm"
+                               name="q"
+                               value="{{ filters.q }}"
+                               placeholder="Nome, e-mail, contato...">
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="small text-muted mb-1">CPF/CNPJ:</label>
+                        <input type="text"
+                               class="form-control form-control-sm"
+                               name="doc"
+                               value="{{ filters.doc }}"
+                               placeholder="Somente números">
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="small text-muted mb-1">E-mail:</label>
+                        <input type="text"
+                               class="form-control form-control-sm"
+                               name="email"
+                               value="{{ filters.email }}"
+                               placeholder="ex@gmail.com">
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="small text-muted mb-1">Ordenar:</label>
+                        <select class="form-select form-select-sm" name="sort">
+                            <option value="nome_asc" {% if filters.sort == 'nome_asc' %}selected{% endif %}>Nome (A→Z)</option>
+                            <option value="nome_desc" {% if filters.sort == 'nome_desc' %}selected{% endif %}>Nome (Z→A)</option>
+                            <option value="id_desc" {% if filters.sort == 'id_desc' %}selected{% endif %}>Mais recentes</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-2 d-flex gap-2">
+                        <button type="submit" class="btn btn-success btn-sm w-100">
+                            <i class="bi bi-funnel"></i> Filtrar
+                        </button>
+
+                        {% if filters.q or filters.doc or filters.email %}
+                        <a href="{{ url_for('main.listar_clientes') }}"
+                           class="btn btn-outline-secondary btn-sm w-100">
+                            <i class="bi bi-x-lg"></i> Limpar
+                        </a>
+                        {% endif %}
+                    </div>
+
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 
     <div class="card shadow-sm border-0 rounded-4 overflow-hidden clientes-table-wrap">
         <div class="card-body p-0">
