@@ -1,9 +1,124 @@
 {% extends "base.html" %}
 
 {% block extra_styles %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/tables.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/forms.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components/tables.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components/forms.css') }}">
+
+  <style>
+    /* =========================
+       RELATÓRIOS - HEADER (título + botões)
+       ========================= */
+
+    .rel-header{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap: 14px;
+    }
+
+    .rel-title h2{
+      color: var(--bs-body-color);
+    }
+
+    .rel-actions{
+      display:flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* botão export mais “premium” */
+    .rel-btn{
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      border-radius: 999px;
+      padding: .65rem 1rem;
+      font-weight: 700;
+      box-shadow: 0 8px 18px rgba(0,0,0,.08);
+      border: 1px solid rgba(0,0,0,.08);
+      white-space: nowrap;
+    }
+
+    /* ícone em bolinha (fica lindo no mobile) */
+    .rel-btn i{
+      width: 34px;
+      height: 34px;
+      display:grid;
+      place-items:center;
+      border-radius: 999px;
+      background: rgba(255,255,255,.18);
+    }
+
+    /* Desktop: deixa alinhado e equilibrado */
+    @media (min-width: 992px){
+      .rel-btn{
+        min-width: 190px;
+        justify-content: center;
+      }
+    }
+
+    /* ✅ Mobile: título em cima e botões em grade */
+    @media (max-width: 768px){
+      .rel-header{
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .rel-actions{
+        display:grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .rel-actions form{
+        width: 100%;
+      }
+
+      .rel-btn{
+        width: 100%;
+        justify-content: center;
+        padding: .9rem .8rem;
+        border-radius: 18px;
+        flex-direction: column;
+        gap: 8px;
+        text-align:center;
+      }
+
+      .rel-btn i{
+        width: 44px;
+        height: 44px;
+        font-size: 1.1rem;
+      }
+
+      .rel-btn span{
+        font-size: .92rem;
+        line-height: 1.1;
+      }
+    }
+
+    /* =========================
+       DARK MODE (header)
+       ========================= */
+    html.dark-mode .rel-btn,
+    body.dark-mode .rel-btn{
+      border-color: #233549 !important;
+      box-shadow: 0 14px 28px rgba(0,0,0,.35) !important;
+    }
+
+    /* PDF (btn-danger) no dark */
+    html.dark-mode .btn.btn-danger.rel-btn,
+    body.dark-mode .btn.btn-danger.rel-btn{
+      filter: saturate(1.05);
+    }
+
+    /* Excel (btn-success) no dark */
+    html.dark-mode .btn.btn-success.rel-btn,
+    body.dark-mode .btn.btn-success.rel-btn{
+      filter: saturate(1.05);
+    }
+  </style>
 {% endblock %}
+
 
 {% block content %}
 
@@ -23,36 +138,37 @@
 <div class="container-fluid py-4" style="max-width: 1200px;">
 
     {# --- Cabeçalho e Bloco de Exportação --- #}
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="text-dark">
-            <i class="bi bi-bar-chart-fill me-2 text-primary"></i> Relatórios
-        </h2>
+    <div class="rel-header mb-4">
+  <div class="rel-title">
+    <h2 class="m-0 fw-bold">
+      <i class="bi bi-bar-chart-fill me-2 text-primary"></i> Relatórios
+    </h2>
+    <div class="small text-muted mt-1">Exportação e análises do período filtrado</div>
+  </div>
 
-        {# --- Bloco de Exportação AGORA COM FORMS GET --- #}
-        <div class="d-flex gap-2">
-            
-            {# FORMULÁRIO DE EXPORTAÇÃO PDF (Substitui o Link <a>) #}
-            <form method="GET" action="{{ url_for('main.exportar_relatorio_pdf') }}" class="form-exportar p-0 m-0">
-                <input type="hidden" name="mes" value="{{ mes_selecionado }}">
-                <input type="hidden" name="ano" value="{{ ano_selecionado }}">
-                <input type="hidden" name="uvis_id" value="{{ uvis_id_selecionado }}">
-                <button type="submit" class="btn btn-danger">
-                    <i class="bi bi-file-earmark-pdf-fill"></i> Exportar PDF
-                </button>
-            </form>
+  <div class="rel-actions">
+    <form method="GET" action="{{ url_for('main.exportar_relatorio_pdf') }}" class="form-exportar p-0 m-0">
+      <input type="hidden" name="mes" value="{{ mes_selecionado }}">
+      <input type="hidden" name="ano" value="{{ ano_selecionado }}">
+      <input type="hidden" name="uvis_id" value="{{ uvis_id_selecionado }}">
+      <button type="submit" class="btn btn-danger rel-btn" title="Exportar PDF">
+        <i class="bi bi-file-earmark-pdf-fill"></i>
+        <span>Exportar PDF</span>
+      </button>
+    </form>
 
-            {# FORMULÁRIO DE EXPORTAÇÃO EXCEL (Substitui o Link <a>) #}
-            <form method="GET" action="{{ url_for('main.exportar_relatorio_excel') }}" class="form-exportar p-0 m-0">
-                <input type="hidden" name="mes" value="{{ mes_selecionado }}">
-                <input type="hidden" name="ano" value="{{ ano_selecionado }}">
-                <input type="hidden" name="uvis_id" value="{{ uvis_id_selecionado }}">
-                <button type="submit" class="btn btn-success">
-                    <i class="bi bi-file-earmark-excel-fill"></i> Exportar Excel
-                </button>
-            </form>
-            
-        </div>
-    </div>
+    <form method="GET" action="{{ url_for('main.exportar_relatorio_excel') }}" class="form-exportar p-0 m-0">
+      <input type="hidden" name="mes" value="{{ mes_selecionado }}">
+      <input type="hidden" name="ano" value="{{ ano_selecionado }}">
+      <input type="hidden" name="uvis_id" value="{{ uvis_id_selecionado }}">
+      <button type="submit" class="btn btn-success rel-btn" title="Exportar Excel">
+        <i class="bi bi-file-earmark-excel-fill"></i>
+        <span>Exportar Excel</span>
+      </button>
+    </form>
+  </div>
+</div>
+
 
     {# --- Bloco de Filtros Unificado (MANTIDO) --- #}
     <form method="GET" class="card p-3 mb-4 shadow-sm rounded-4">

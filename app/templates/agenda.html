@@ -1,37 +1,300 @@
 {% extends "base.html" %}
 {% block extra_styles %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/fullcalendar.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/fullcalendar.css') }}">
+
+  <style>
+    /* =========================
+       FULLCALENDAR - MOBILE UX
+       ========================= */
+
+    /* melhora toque em geral */
+    #calendar .fc * { -webkit-tap-highlight-color: transparent; }
+
+    @media (max-width: 768px) {
+      /* menos “poluição” no topo */
+      #calendar .fc-toolbar.fc-header-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: .5rem;
+        margin-bottom: .75rem;
+      }
+
+      #calendar .fc-toolbar-chunk {
+        display: flex;
+        justify-content: space-between;
+        gap: .5rem;
+      }
+
+      /* botões maiores e fáceis de clicar */
+      #calendar .fc .fc-button {
+        padding: .55rem .7rem !important;
+        font-size: .9rem !important;
+        border-radius: 999px !important;
+        line-height: 1 !important;
+      }
+
+      /* título menor pra caber */
+      #calendar .fc-toolbar-title {
+        font-size: 1.1rem !important;
+        text-align: center;
+      }
+
+      /* quando estiver no mês, dá mais “respiro” */
+      #calendar .fc-daygrid-day-frame { min-height: 64px; }
+      #calendar .fc-daygrid-day-number { font-size: .85rem; opacity: .9; }
+
+      /* eventos no mês: mais compactos, porém legíveis */
+      #calendar .fc-daygrid-event {
+        padding: 2px 6px !important;
+        border-radius: 10px !important;
+        font-size: .78rem !important;
+      }
+
+      /* view lista (a melhor no mobile) */
+      #calendar .fc-list-event-title,
+      #calendar .fc-list-event-time {
+        font-size: .95rem !important;
+      }
+
+      #calendar .fc-list-day-cushion {
+        position: sticky;
+        top: 0; /* bom quando rola a lista */
+        z-index: 2;
+      }
+    }
+
+    /* =========================
+       DARK MODE - FULLCALENDAR
+       Seu sistema usa html.dark-mode e/ou body.dark-mode
+       ========================= */
+
+    html.dark-mode #calendar,
+    body.dark-mode #calendar {
+      --fc-border-color: #233549;
+      --fc-page-bg-color: #101927;
+      --fc-neutral-bg-color: #152233;
+      --fc-today-bg-color: rgba(59,130,246,.15);
+      --fc-event-border-color: rgba(255,255,255,.08);
+      --fc-event-bg-color: rgba(59,130,246,.22);
+      --fc-event-text-color: #ffffff;
+      color: #e8eef8;
+    }
+
+    html.dark-mode #calendar .fc,
+    body.dark-mode #calendar .fc {
+      background: #101927;
+      border-radius: 16px;
+    }
+
+    html.dark-mode #calendar .fc-scrollgrid,
+    body.dark-mode #calendar .fc-scrollgrid {
+      border-color: #233549 !important;
+    }
+
+    html.dark-mode #calendar .fc-col-header-cell,
+    body.dark-mode #calendar .fc-col-header-cell,
+    html.dark-mode #calendar .fc-daygrid-day,
+    body.dark-mode #calendar .fc-daygrid-day {
+      border-color: #233549 !important;
+    }
+
+    html.dark-mode #calendar .fc-daygrid-day-number,
+    body.dark-mode #calendar .fc-daygrid-day-number,
+    html.dark-mode #calendar .fc-col-header-cell-cushion,
+    body.dark-mode #calendar .fc-col-header-cell-cushion,
+    html.dark-mode #calendar .fc-toolbar-title,
+    body.dark-mode #calendar .fc-toolbar-title {
+      color: #e8eef8 !important;
+    }
+
+    /* botões no dark */
+    html.dark-mode #calendar .fc .fc-button,
+    body.dark-mode #calendar .fc .fc-button {
+      background: #152233 !important;
+      border-color: #233549 !important;
+      color: #e8eef8 !important;
+    }
+
+    html.dark-mode #calendar .fc .fc-button:hover,
+    body.dark-mode #calendar .fc .fc-button:hover {
+      filter: brightness(1.08);
+    }
+
+    html.dark-mode #calendar .fc .fc-button:disabled,
+    body.dark-mode #calendar .fc .fc-button:disabled {
+      opacity: .6;
+    }
+
+    /* lista no dark */
+    html.dark-mode #calendar .fc-list,
+    body.dark-mode #calendar .fc-list {
+      border-color: #233549 !important;
+    }
+
+    html.dark-mode #calendar .fc-list-day-cushion,
+    body.dark-mode #calendar .fc-list-day-cushion {
+      background: #152233 !important;
+      color: #e8eef8 !important;
+    }
+
+    html.dark-mode #calendar .fc-list-event:hover td,
+    body.dark-mode #calendar .fc-list-event:hover td {
+      background: rgba(255,255,255,.04) !important;
+    }
+
+    html.dark-mode #calendar .fc-popover,
+    body.dark-mode #calendar .fc-popover {
+      background: #152233 !important;
+      border: 1px solid #233549 !important;
+      color: #e8eef8 !important;
+    }
+    /* =========================
+   HEADER AGENDA (TÍTULO + BOTÕES)
+   ========================= */
+
+.agenda-header{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap: 14px;
+}
+
+.agenda-title h2{
+  color: var(--bs-body-color);
+}
+
+.agenda-actions{
+  display:flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.agenda-btn{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  border-radius: 999px;
+  padding: .65rem 1rem;
+  font-weight: 600;
+  box-shadow: 0 8px 18px rgba(0,0,0,.08);
+  border: 1px solid rgba(0,0,0,.08);
+}
+
+/* ícone em “bolinha” */
+.agenda-btn i{
+  width: 34px;
+  height: 34px;
+  display:grid;
+  place-items:center;
+  border-radius: 999px;
+  background: rgba(0,0,0,.06);
+}
+
+/* Desktop: deixa ok */
+@media (min-width: 992px){
+  .agenda-btn{
+    min-width: 190px;
+    justify-content: center;
+  }
+}
+
+/* ✅ Mobile: título em cima e botões em grade */
+@media (max-width: 768px){
+  .agenda-header{
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .agenda-title{
+    text-align: left;
+  }
+
+  .agenda-actions{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .agenda-btn{
+    width: 100%;
+    justify-content: center;
+    padding: .9rem .8rem;
+    border-radius: 18px;
+    flex-direction: column;
+    gap: 8px;
+    text-align:center;
+  }
+
+  .agenda-btn i{
+    width: 44px;
+    height: 44px;
+    font-size: 1.1rem;
+  }
+
+  .agenda-btn span{
+    font-size: .92rem;
+    line-height: 1.1;
+  }
+}
+
+/* =========================
+   DARK MODE (header)
+   ========================= */
+html.dark-mode .agenda-btn,
+body.dark-mode .agenda-btn{
+  border-color: #233549 !important;
+  box-shadow: 0 14px 28px rgba(0,0,0,.35) !important;
+}
+
+html.dark-mode .agenda-btn.btn-outline-secondary,
+body.dark-mode .agenda-btn.btn-outline-secondary{
+  background: #152233 !important;
+  color: #e8eef8 !important;
+}
+
+html.dark-mode .agenda-btn.btn-outline-secondary i,
+body.dark-mode .agenda-btn.btn-outline-secondary i{
+  background: rgba(255,255,255,.08) !important;
+}
+
+html.dark-mode .agenda-btn.btn-success i,
+body.dark-mode .agenda-btn.btn-success i{
+  background: rgba(255,255,255,.14) !important;
+}
+
+  </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4" style="max-width: 1200px;">
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        
-        <h2 class="text-dark m-0 fw-bold">
-            <i class="bi bi-calendar-event-fill me-2 text-primary"></i> Agenda
-        </h2>
+<div class="agenda-header mb-4">
+  <div class="agenda-title">
+    <h2 class="m-0 fw-bold">
+      <i class="bi bi-calendar-event-fill me-2 text-primary"></i> Agenda
+    </h2>
+    <div class="small text-muted mt-1">Gerencie e exporte os agendamentos</div>
+  </div>
 
-        {% if current_user.is_authenticated and current_user.tipo_usuario == "admin" %}
-        <div class="d-flex gap-2">
-            
-            {# Exportar Tudo #}
-            <a href="{{ url_for('main.agenda_exportar_excel', all=1) }}" 
-               class="btn btn-secondary d-flex align-items-center gap-2"
-               title="Baixar base completa sem filtros">
-                <i class="bi bi-download"></i> <span class="d-none d-md-inline">Exportar Tudo</span>
-            </a>
+  {% if current_user.is_authenticated and current_user.tipo_usuario == "admin" %}
+  <div class="agenda-actions">
+    <a href="{{ url_for('main.agenda_exportar_excel', all=1) }}"
+       class="btn btn-outline-secondary agenda-btn"
+       title="Baixar base completa sem filtros">
+      <i class="bi bi-download"></i>
+      <span>Exportar Tudo</span>
+    </a>
 
-            {# Exportar Filtro Atual #}
-            <a href="{{ url_for('main.agenda_exportar_excel', **request.args.to_dict()) }}" 
-               class="btn btn-success text-white d-flex align-items-center gap-2 shadow-sm">
-                <i class="bi bi-file-earmark-excel"></i> Exportar Atual
-            </a>
+    <a href="{{ url_for('main.agenda_exportar_excel', **request.args.to_dict()) }}"
+       class="btn btn-success text-white agenda-btn"
+       title="Exportar com filtros atuais">
+      <i class="bi bi-file-earmark-excel"></i>
+      <span>Exportar Atual</span>
+    </a>
+  </div>
+  {% endif %}
+</div>
 
-        </div>
-        {% endif %}
-
-    </div>
 
     <form method="get" action="{{ url_for('main.agenda') }}" class="card p-3 mb-4 shadow-sm rounded-4 border-0">
         <div class="row g-2 align-items-end">
@@ -171,73 +434,131 @@
 
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-    const eventos = JSON.parse(document.getElementById("eventos-dados").textContent);
+    const eventos = JSON.parse(document.getElementById("eventos-dados").textContent || "[]");
+    const calendarEl = document.getElementById("calendar");
 
-    const calendar = new FullCalendar.Calendar(document.getElementById("calendar"), {
-        initialView: "dayGridMonth",
-        initialDate: "{{ initial_date }}",
-        locale: "pt-br",
-        height: "auto",
-        nowIndicator: true,
-        dayMaxEvents: true,
+    // ✅ HOJE (corrige cair na semana anterior por initialDate vindo do backend)
+    const hoje = new Date();
 
-        headerToolbar: {
-          left: "prev,next today",
-          center: "title",
-          right: "dayGridMonth,timeGridWeek,listWeek",
-        },
+    // ✅ Detecta mobile
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
 
-        buttonText: {
-          today: "Hoje",
-          month: "Mês",
-          week: "Semana",
-          day: "Dia",
-          list: "Lista",
-        },
+    // ✅ Views permitidas conforme dispositivo
+    // Mobile: só Lista
+    // Desktop: Mês + Lista (remove Semana)
+    const toolbarRight = isMobile ? "listWeek" : "dayGridMonth,listWeek";
 
-        events: eventos,
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      // ✅ Mobile abre LISTA direto
+      initialView: isMobile ? "listWeek" : "dayGridMonth",
+      initialDate: hoje,
 
-        eventClick: function (info) {
-          info.jsEvent.preventDefault();
+      // ✅ PT-BR sempre
+      locale: "pt-br",
+      height: "auto",
+      nowIndicator: true,
+      dayMaxEvents: true,
 
-          if (info.event.url) {
-            window.location.href = info.event.url;
-            return;
-          }
+      // ✅ Texto quando não existir nada
+      noEventsContent: () => "Nenhum agendamento encontrado.",
 
-          const p = info.event.extendedProps || {};
+      // ✅ Mais textos PT-BR
+      allDayText: "Dia todo",
+      moreLinkText: (n) => `+${n} mais`,
+      weekText: "Semana",
 
-          // Preencher dados do modal
-          document.getElementById("m-uvis").innerText = p.uvis || "-";
-          document.getElementById("m-foco").innerText = p.foco || "-";
-          document.getElementById("m-hora").innerText = p.hora || "-";
-          
-          // Configurar Badge de Status (Cor e Texto)
-          const statusEl = document.getElementById("m-status");
-          const statusText = p.status || "Indefinido";
-          statusEl.innerText = statusText;
-          
-          // Remove classes anteriores
-          statusEl.className = "badge rounded-pill px-3 py-2 fs-6";
-          
-          // Adiciona cor baseada no status
-          if (statusText === 'APROVADO') statusEl.classList.add('bg-success');
-          else if (statusText === 'NEGADO') statusEl.classList.add('bg-danger');
-          else if (statusText === 'EM ANÁLISE') statusEl.classList.add('bg-warning', 'text-dark');
-          else if (statusText === 'APROVADO COM RECOMENDAÇÕES') statusEl.classList.add('bg-warning', 'text-dark'); 
-          else statusEl.classList.add('bg-secondary'); // Pendente
+      headerToolbar: {
+        left: "prev,next today",
+        center: "title",
+        right: toolbarRight,
+      },
 
-          const modal = new bootstrap.Modal(document.getElementById("modalEvento"));
-          modal.show();
-        },
+      // ✅ Botões PT-BR (e sem “Semana” no desktop)
+      buttonText: {
+        today: "Hoje",
+        month: "Mês",
+        week: "Semana",
+        day: "Dia",
+        list: "Lista",
+      },
 
-        eventDidMount: function (info) {
-          info.el.setAttribute("title", info.event.title);
-          info.el.style.cursor = "pointer";
-        },
+      // ✅ melhora leitura do LISTA no mobile
+      listDayFormat: { weekday: "short", day: "2-digit", month: "2-digit" },
+      listDaySideFormat: false,
+
+      events: eventos,
+
+      eventClick: function (info) {
+        info.jsEvent.preventDefault();
+
+        if (info.event.url) {
+          window.location.href = info.event.url;
+          return;
+        }
+
+        const p = info.event.extendedProps || {};
+
+        // Preencher dados do modal
+        document.getElementById("m-uvis").innerText = p.uvis || "-";
+        document.getElementById("m-foco").innerText = p.foco || "-";
+        document.getElementById("m-hora").innerText = p.hora || "-";
+
+        // Badge Status
+        const statusEl = document.getElementById("m-status");
+        const statusText = p.status || "Indefinido";
+        statusEl.innerText = statusText;
+
+        // reset classes
+        statusEl.className = "badge rounded-pill px-3 py-2 fs-6";
+
+        if (statusText === "APROVADO") statusEl.classList.add("bg-success");
+        else if (statusText === "NEGADO") statusEl.classList.add("bg-danger");
+        else if (statusText === "EM ANÁLISE") statusEl.classList.add("bg-warning", "text-dark");
+        else if (statusText === "APROVADO COM RECOMENDAÇÕES") statusEl.classList.add("bg-warning", "text-dark");
+        else statusEl.classList.add("bg-secondary");
+
+        const modal = new bootstrap.Modal(document.getElementById("modalEvento"));
+        modal.show();
+      },
+
+      eventDidMount: function (info) {
+        info.el.setAttribute("title", info.event.title);
+        info.el.style.cursor = "pointer";
+      },
     });
 
     calendar.render();
+
+    // ✅ Se redimensionar (mobile <-> desktop), troca toolbar e view automaticamente
+    window.addEventListener("resize", () => {
+      const mobileNow = window.matchMedia("(max-width: 768px)").matches;
+
+      // troca view conforme dispositivo
+      const desiredView = mobileNow ? "listWeek" : "dayGridMonth";
+      if (calendar.view.type !== desiredView) calendar.changeView(desiredView);
+
+      // troca botões no topo (right)
+      calendar.setOption("headerToolbar", {
+        left: "prev,next today",
+        center: "title",
+        right: mobileNow ? "listWeek" : "dayGridMonth,listWeek",
+      });
+    });
   });
+
+  if (sidebarToggle) {
+  sidebarToggle.addEventListener("click", () => {
+    if (window.innerWidth < 992) {
+      body.classList.toggle("sidebar-open");
+    } else {
+      body.classList.toggle("sidebar-collapsed");
+    }
+    setTimeout(syncNavbarOffset, 50);
+  });
+}
+
+
 </script>
+
+
 {% endblock %}
