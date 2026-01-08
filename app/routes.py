@@ -122,25 +122,48 @@ def aplicar_filtros_base(query, filtro_data, uvis_id):
         query = query.filter(Solicitacao.usuario_id == int(uvis_id))
             
     return query
-# --- DASHBOARD UVIS ---
 
+from functools import wraps
+from flask import abort
+from flask_login import current_user
+
+def roles_required(*roles):
+    def deco(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            if not current_user.is_authenticated:
+                abort(401)
+            if current_user.tipo_usuario not in roles:
+                abort(403)
+            return fn(*args, **kwargs)
+        return wrapper
+    return deco
+
+# --- DASHBOARD UVIS ---
 @bp.route('/')
 @login_required
 def dashboard():
-    # 1. Redirecionamento de Perfis Administrativos (Prevenção de acesso indevido)
+
+    if current_user.tipo_usuario == 'piloto':
+        return redirect(url_for('main.piloto_os'))
+
     if current_user.tipo_usuario in ['admin', 'operario', 'visualizar']:
         return redirect(url_for('main.admin_dashboard'))
 
-    # 2. Query Otimizada
-    query = db.session.query(Solicitacao).options(joinedload(Solicitacao.usuario))\
+    # ✅ UVIS: só as solicitações dela + carrega piloto pra exibir
+    query = (
+        Solicitacao.query
+        .options(
+            joinedload(Solicitacao.usuario),
+            joinedload(Solicitacao.piloto)
+        )
         .filter(Solicitacao.usuario_id == current_user.id)
+    )
 
-    # 3. Aplicação de Filtros de Interface
     filtro_status = request.args.get('status')
     if filtro_status:
         query = query.filter(Solicitacao.status == filtro_status)
 
-    # 4. Paginação de Performance
     page = request.args.get("page", 1, type=int)
     paginacao = query.order_by(Solicitacao.data_criacao.desc())\
         .paginate(page=page, per_page=6, error_out=False)
@@ -148,7 +171,7 @@ def dashboard():
     return render_template(
         'dashboard.html',
         solicitacoes=paginacao.items,
-        paginacao=paginacao
+        paginacao=paginacao,
     )
 
 # --- PAINEL DE GESTÃO (Visualização para todos) ---
@@ -177,6 +200,18 @@ def admin_dashboard():
         .options(joinedload(Solicitacao.usuario)) \
         .join(Usuario)
 
+    query = (
+        Solicitacao.query
+        .options(
+            joinedload(Solicitacao.usuario),
+            joinedload(Solicitacao.piloto)  # bom pra exibir o nome do piloto já atribuído
+        )
+        .join(Usuario)
+    )
+
+    pilotos = Pilotos.query.order_by(Pilotos.nome_piloto.asc()).all()
+
+
     # --- Aplicação dos filtros ---
     if filtro_status:
         query = query.filter(Solicitacao.status == filtro_status)
@@ -203,9 +238,9 @@ def admin_dashboard():
         pedidos=paginacao.items,
         paginacao=paginacao,
         is_editable=is_editable,
-        now=datetime.now()
+        now=datetime.now(),
+        pilotos=pilotos,
     )
-
 
 @bp.route('/admin/exportar_excel')
 @login_required
@@ -359,7 +394,6 @@ def atualizar(id):
 
     # 🔐 Permissão
     if current_user.tipo_usuario not in ['admin', 'operario']:
-        # Se for form normal, não devolve JSON
         if request.accept_mimetypes.accept_html and not request.is_json:
             flash("Permissão negada.", "danger")
             return redirect(request.referrer or url_for("main.admin_dashboard"))
@@ -373,6 +407,29 @@ def atualizar(id):
     pedido.justificativa = request.form.get('justificativa')
     pedido.latitude = request.form.get('latitude')
     pedido.longitude = request.form.get('longitude')
+
+    # ✅ Atribuição de piloto (opcional)
+    piloto_id = request.form.get("piloto_id")
+
+    if piloto_id in (None, "", "null", "undefined"):
+        pedido.piloto_id = None
+    else:
+        try:
+            piloto_id_int = int(piloto_id)
+            existe = Pilotos.query.get(piloto_id_int)
+            if not existe:
+                flash("Piloto selecionado não existe.", "warning")
+                return redirect(request.referrer or url_for("main.admin_dashboard"))
+            pedido.piloto_id = piloto_id_int
+        except ValueError:
+            flash("Piloto inválido.", "warning")
+            return redirect(request.referrer or url_for("main.admin_dashboard"))
+
+    # ✅ Regra de negócio: se aprovou, precisa ter piloto
+    status_aprovacao = ["APROVADO", "APROVADO COM RECOMENDAÇÕES"]
+    if pedido.status in status_aprovacao and not pedido.piloto_id:
+        flash("Para aprovar, selecione um piloto responsável.", "warning")
+        return redirect(request.referrer or url_for("main.admin_dashboard"))
 
     # Processamento de Anexo
     file = request.files.get("anexo")
@@ -390,7 +447,6 @@ def atualizar(id):
                 pedido.anexo_nome = original_filename
             except Exception as e:
                 current_app.logger.error(f"Erro ao salvar arquivo físico: {e}")
-                # Form normal: volta e mostra mensagem
                 if request.accept_mimetypes.accept_html and not request.is_json:
                     flash("Falha ao salvar o arquivo no servidor.", "danger")
                     return redirect(request.referrer or url_for("main.admin_dashboard"))
@@ -401,22 +457,32 @@ def atualizar(id):
                 return redirect(request.referrer or url_for("main.admin_dashboard"))
             return jsonify({"error": "Formato de arquivo não permitido."}), 400
 
-    # commit final
+    # commit final (MANTER APENAS ESTE BLOCO)
     try:
         db.session.commit()
 
-        # ✅ Se for uma chamada AJAX (fetch), mantém JSON
         is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.is_json
         if is_ajax:
             return jsonify({
                 "ok": True,
                 "message": "Solicitação atualizada com sucesso!",
-                "anexo_nome": pedido.anexo_nome
+                "anexo_nome": pedido.anexo_nome,
+                "piloto_id": pedido.piloto_id,
             }), 200
 
-        # ✅ Se for submit normal (seu caso), REDIRECIONA e não mostra JSON
         flash("Solicitação atualizada com sucesso!", "success")
         return redirect(request.referrer or url_for("main.admin_dashboard"))
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Erro de Banco (Atualizar ID {id}): {e}")
+
+        if request.accept_mimetypes.accept_html and not request.is_json:
+            flash("Erro ao gravar dados no banco de dados.", "danger")
+            return redirect(request.referrer or url_for("main.admin_dashboard"))
+
+        return jsonify({"error": "Erro ao gravar dados no banco de dados."}), 500
+
 
     except Exception as e:
         db.session.rollback()
@@ -2370,6 +2436,12 @@ def admin_uvis_listar():
         page=page, per_page=10, error_out=False
     )
 
+    query = db.session.query(Solicitacao).options(
+        joinedload(Solicitacao.usuario),
+        joinedload(Solicitacao.piloto)  # ✅
+    ).filter(Solicitacao.usuario_id == current_user.id)
+
+
     filters = {
         "q": q,
         "regiao": regiao,
@@ -3969,3 +4041,98 @@ def deletar_piloto(piloto_id):
 
     flash("Piloto excluído com sucesso.", "success")
     return redirect(url_for("main.listar_pilotos"))
+
+@bp.route('/piloto/os')
+@login_required
+@roles_required('piloto')
+def piloto_os():
+    if not current_user.piloto_id:
+        flash("Piloto sem vínculo cadastrado.", "danger")
+        return redirect(url_for('main.dashboard'))
+
+    status_ok = ["APROVADA", "APROVADA COM RECOMENDAÇÕES", "APROVADO", "APROVADO COM RECOMENDAÇÕES"]
+
+    query = (
+        Solicitacao.query
+        .options(joinedload(Solicitacao.usuario))
+        .filter(
+            Solicitacao.piloto_id == current_user.piloto_id,
+            Solicitacao.status.in_(status_ok)
+        )
+    )
+
+    filtro_data = request.args.get("data")  # ex: 2026-01
+    uvis_id = request.args.get("uvis_id")
+    query = aplicar_filtros_base(query, filtro_data, uvis_id)
+
+    page = request.args.get("page", 1, type=int)
+    paginacao = query.order_by(
+        Solicitacao.data_agendamento.asc(),
+        Solicitacao.hora_agendamento.asc()
+    ).paginate(page=page, per_page=6, error_out=False)
+
+    return render_template(
+        "piloto_os.html",
+        pedidos=paginacao.items,
+        paginacao=paginacao,
+        status_ok=status_ok
+    )
+
+
+@bp.route('/piloto/os/<int:os_id>/concluir', methods=['POST'])
+@login_required
+@roles_required('piloto')
+def piloto_concluir_os(os_id):
+
+    s = Solicitacao.query.get_or_404(os_id)
+
+    if s.piloto_id != current_user.piloto_id:
+        flash("Você não pode alterar esta OS.", "danger")
+        return redirect(url_for('main.piloto_os'))
+
+    status_ok = ["APROVADO", "APROVADO COM RECOMENDAÇÕES", "APROVADA", "APROVADA COM RECOMENDAÇÕES"]
+    if s.status not in status_ok:
+        flash("A OS não está aprovada.", "warning")
+        return redirect(url_for('main.piloto_os'))
+
+    s.status = "CONCLUÍDO"
+    db.session.commit()
+
+    flash("Ordem de serviço concluída com sucesso.", "success")
+    return redirect(url_for('main.piloto_os'))
+
+@bp.route("/piloto/os/<int:solicitacao_id>", methods=["GET"], endpoint="piloto_ver_os")
+@login_required
+@roles_required("piloto")
+def piloto_ver_os(solicitacao_id):
+    s = (Solicitacao.query
+         .options(
+             joinedload(Solicitacao.usuario),
+             joinedload(Solicitacao.piloto)
+         )
+         .get_or_404(solicitacao_id))
+
+    # 🔒 piloto só pode ver OS dele
+    if s.piloto_id != current_user.piloto_id:
+        flash("Acesso negado a esta OS.", "danger")
+        return redirect(url_for("main.piloto_os"))
+
+    # ✅ somente leitura
+    is_editable = False
+
+    # ✅ mesma lista de pilotos do admin NÃO precisa aqui
+    pilotos = []
+
+    # 🔥 Reaproveita o mesmo HTML do admin, só que em modo read-only
+    return render_template(
+        "admin_editar_completo.html",   # ou o template de “detalhe” que o admin usa
+        pedido=s,
+        is_editable=is_editable,
+        pilotos=pilotos,
+        # se o template usa essas listas:
+        status_opcoes=["PENDENTE","EM ANÁLISE","APROVADO","APROVADO COM RECOMENDAÇÕES","NEGADO"],
+        foco_opcoes=["Foco 1","Foco 2","Foco 3"],
+        tipo_visita_opcoes=["Tipo 1","Tipo 2","Tipo 3"],
+        uf_opcoes=["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"],
+    )
+
