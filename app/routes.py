@@ -41,7 +41,7 @@ from sqlalchemy.orm import joinedload
 # APP
 # ==========================
 from app import db
-from app.models import Notificacao, Solicitacao, Usuario, Clientes
+from app.models import Notificacao, Solicitacao, Usuario, Clientes, Pilotos
 
 print("--- ROTAS CARREGADAS COM SUCESSO ---")
 
@@ -3590,3 +3590,382 @@ def admin_uvis_exportar():
 @bp.route('/sw.js')
 def serve_sw():
     return bp.send_static_file('sw.js')
+# se você já tem essa função no projeto, reaproveite
+def only_digits(v: str) -> str:
+    return re.sub(r"\D+", "", v or "")
+
+@bp.route('/pilotos/cadastrar', methods=['GET', 'POST'], endpoint='cadastrar_pilotos')
+@login_required
+def cadastrar_pilotos():
+    # Segurança: só admin
+    if getattr(current_user, "tipo_usuario", None) != "admin":
+        abort(403)
+
+    errors = {}
+    form = {}
+
+    if request.method == "POST":
+        nome_piloto = (request.form.get("nome_piloto") or "").strip()
+        regiao = (request.form.get("regiao") or "").strip()
+        telefone = (request.form.get("telefone") or "").strip()
+
+        # Mantém valores pra re-render do form
+        form = {
+            "nome_piloto": nome_piloto,
+            "regiao": regiao,
+            "telefone": telefone,
+        }
+
+        # Obrigatórios
+        if not nome_piloto:
+            errors["nome_piloto"] = "Informe o nome do piloto."
+
+        # Telefone (se preenchido)
+        tel_digits = only_digits(telefone)
+        if telefone:
+            if len(tel_digits) not in (10, 11):
+                errors["telefone"] = "Telefone deve ter 10 ou 11 dígitos (com DDD)."
+
+        # Duplicidade (opcional, mas recomendado)
+        # - Normaliza nome pra evitar duplicar por espaços/case
+        if nome_piloto:
+            q = Pilotos.query.filter(
+                db.func.lower(Pilotos.nome_piloto) == nome_piloto.lower()
+            )
+
+            # Se telefone veio, checa duplicidade nome+telefone
+            # Se não veio telefone, checa duplicidade só por nome
+            if tel_digits:
+                q = q.filter(Pilotos.telefone == tel_digits)
+
+            existe = q.first()
+            if existe:
+                if tel_digits:
+                    errors["nome_piloto"] = "Já existe um piloto com esse nome e telefone."
+                else:
+                    errors["nome_piloto"] = "Já existe um piloto cadastrado com esse nome."
+
+        if errors:
+            flash("Corrija os campos destacados.", "warning")
+            return render_template("cadastrar_pilotos.html", form=form, errors=errors)
+
+        novo = Pilotos(
+            nome_piloto=nome_piloto,
+            regiao=regiao or None,
+            telefone=tel_digits or None,  # salva sem máscara
+        )
+
+        db.session.add(novo)
+        db.session.commit()
+
+        flash("Piloto cadastrado com sucesso!", "success")
+        return redirect(url_for("main.listar_pilotos"))
+
+    return render_template("cadastrar_pilotos.html", form=form, errors=errors)
+
+@bp.route("/pilotos", methods=["GET"], endpoint="listar_pilotos")
+@login_required
+def listar_pilotos():
+    user_tipo = getattr(current_user, "tipo_usuario", None)
+
+    # ✅ Permissões: admin e uvis podem acessar
+    if user_tipo not in ("admin", "uvis"):
+        abort(403)
+
+    # -----------------------------
+    # Params (filtros / paginação)
+    # -----------------------------
+    q = (request.args.get("q") or "").strip()
+    regiao = (request.args.get("regiao") or "").strip().upper()  # NORTE/SUL/LESTE/OESTE
+    telefone = (request.args.get("telefone") or "").strip()
+    sort = (request.args.get("sort") or "nome_asc").strip()
+
+    try:
+        page = int(request.args.get("page") or 1)
+    except ValueError:
+        page = 1
+    page = max(1, page)
+
+    try:
+        per_page = int(request.args.get("per_page") or 20)
+    except ValueError:
+        per_page = 20
+    per_page = 10 if per_page < 10 else 50 if per_page > 50 else per_page
+
+    export = (request.args.get("export") or "").strip().lower()  # "xlsx"
+
+    # -----------------------------
+    # ✅ Controle de região para UVIS
+    # -----------------------------
+    uvis_regiao = (getattr(current_user, "regiao", None) or "").strip().upper()
+
+    if user_tipo == "uvis":
+        if not uvis_regiao:
+            flash("Sua UVIS está sem região cadastrada. Contate o administrador.", "warning")
+            return render_template("listar_pilotos.html", pilotos=[], filters={
+                "q": q, "regiao": "", "telefone": telefone, "sort": sort,
+                "page": 1, "per_page": per_page, "total": 0, "total_pages": 1
+            }, is_admin=False, uvis_regiao=None)
+
+        # 🔒 Força a região do filtro a ser a mesma da UVIS (ignora querystring)
+        regiao = uvis_regiao
+
+    # -----------------------------
+    # Query base
+    # -----------------------------
+    query = Pilotos.query
+
+    # filtro região
+    if regiao:
+        query = query.filter(Pilotos.regiao == regiao)
+
+    # filtro telefone (salvo como dígitos)
+    if telefone:
+        query = query.filter(Pilotos.telefone.ilike(f"%{only_digits(telefone)}%"))
+
+    # busca geral (nome, regiao, telefone)
+    if q:
+        like = f"%{q}%"
+        q_digits = only_digits(q)
+
+        query = query.filter(
+            db.or_(
+                Pilotos.nome_piloto.ilike(like),
+                Pilotos.regiao.ilike(like),
+                Pilotos.telefone.ilike(f"%{q_digits}%") if q_digits else db.false(),
+            )
+        )
+
+    # ordenação
+    if sort == "nome_desc":
+        query = query.order_by(Pilotos.nome_piloto.desc())
+    elif sort == "id_desc":
+        query = query.order_by(Pilotos.id.desc())
+    elif sort == "id_asc":
+        query = query.order_by(Pilotos.id.asc())
+    else:
+        query = query.order_by(Pilotos.nome_piloto.asc())
+
+    # -----------------------------
+    # Exportação Excel (filtrado)
+    # -----------------------------
+    if export == "xlsx":
+        # 🔒 UVIS exporta apenas sua região (já está forçado acima)
+        rows = query.all()
+
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        from io import BytesIO
+        from datetime import datetime
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Pilotos"
+
+        header_fill = PatternFill("solid", fgColor="1F2937")
+        header_font = Font(bold=True, color="FFFFFF")
+        header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+        thin = Side(style="thin", color="E5E7EB")
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+        text_align = Alignment(horizontal="left", vertical="center", wrap_text=True)
+        center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+        ws["A1"] = "Relatório de Pilotos"
+        ws["A1"].font = Font(bold=True, size=14)
+        ws["A2"] = f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        ws["A2"].font = Font(color="6B7280")
+
+        if user_tipo == "uvis":
+            ws["A3"] = f"Região (UVIS): {uvis_regiao}"
+            ws["A3"].font = Font(color="6B7280")
+
+        start_row = 5 if user_tipo == "uvis" else 4
+        headers = ["ID", "Nome", "Região", "Telefone"]
+
+        for col_idx, h in enumerate(headers, start=1):
+            cell = ws.cell(row=start_row, column=col_idx, value=h)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = header_align
+            cell.border = border
+
+        for i, p in enumerate(rows, start=start_row + 1):
+            values = [p.id, p.nome_piloto, p.regiao or "", format_phone_br(p.telefone or "") or ""]
+            for col_idx, v in enumerate(values, start=1):
+                cell = ws.cell(row=i, column=col_idx, value=v)
+                cell.border = border
+                cell.alignment = center_align if col_idx == 1 else text_align
+                if col_idx == 4:
+                    cell.number_format = "@"
+
+        last_row = start_row + len(rows)
+        last_col = len(headers)
+
+        ws.freeze_panes = ws[f"A{start_row+1}"]
+        ws.auto_filter.ref = f"A{start_row}:{get_column_letter(last_col)}{max(last_row, start_row)}"
+
+        max_widths = {1: 8, 2: 30, 3: 14, 4: 20}
+        for col_idx in range(1, last_col + 1):
+            max_len = len(headers[col_idx - 1])
+            for r in range(start_row + 1, last_row + 1):
+                val = ws.cell(row=r, column=col_idx).value
+                if val is None:
+                    continue
+                max_len = max(max_len, len(str(val)))
+            ws.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 2, max_widths.get(col_idx, 35))
+
+        zebra_fill = PatternFill("solid", fgColor="F9FAFB")
+        for r in range(start_row + 1, last_row + 1):
+            if (r - (start_row + 1)) % 2 == 1:
+                for ccol in range(1, last_col + 1):
+                    ws.cell(row=r, column=ccol).fill = zebra_fill
+
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
+        filename = f"pilotos_{stamp}.xlsx"
+
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name=filename,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    # -----------------------------
+    # Paginação
+    # -----------------------------
+    import math
+    total = query.count()
+    total_pages = max(1, math.ceil(total / per_page))
+    if page > total_pages:
+        page = total_pages
+
+    pilotos_db = query.offset((page - 1) * per_page).limit(per_page).all()
+
+    pilotos = [
+        {
+            "id": p.id,
+            "nome_piloto": p.nome_piloto,
+            "regiao": p.regiao or "-",
+            "telefone_fmt": format_phone_br(p.telefone or "") or "-",
+            "telefone_digits": only_digits(p.telefone or ""),
+        }
+        for p in pilotos_db
+    ]
+
+    filters = {
+        "q": q,
+        "regiao": regiao,
+        "telefone": telefone,
+        "sort": sort,
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "total_pages": total_pages,
+    }
+
+    return render_template(
+        "listar_pilotos.html",
+        pilotos=pilotos,
+        filters=filters,
+        is_admin=(user_tipo == "admin"),
+        uvis_regiao=(uvis_regiao if user_tipo == "uvis" else None),
+    )
+
+
+import re
+from flask import request, render_template, flash, redirect, url_for, abort
+from flask_login import login_required, current_user
+
+def only_digits(v: str) -> str:
+    return re.sub(r"\D+", "", v or "")
+
+REGIOES = {"NORTE", "SUL", "LESTE", "OESTE"}
+
+@bp.route("/pilotos/<int:piloto_id>/editar", methods=["GET", "POST"], endpoint="editar_piloto")
+@login_required
+def editar_piloto(piloto_id):
+    # Segurança: só admin
+    if getattr(current_user, "tipo_usuario", None) != "admin":
+        abort(403)
+
+    piloto = Pilotos.query.get_or_404(piloto_id)
+
+    errors = {}
+    form = {}
+
+    if request.method == "POST":
+        nome_piloto = (request.form.get("nome_piloto") or "").strip()
+        regiao = (request.form.get("regiao") or "").strip().upper()
+        telefone = (request.form.get("telefone") or "").strip()
+        tel_digits = only_digits(telefone)
+
+        # mantém valores pro template
+        form = {
+            "nome_piloto": nome_piloto,
+            "regiao": regiao,
+            "telefone": telefone,
+        }
+
+        # obrigatórios
+        if not nome_piloto:
+            errors["nome_piloto"] = "Informe o nome do piloto."
+
+        # região (select)
+        if regiao and regiao not in REGIOES:
+            errors["regiao"] = "Selecione uma região válida."
+
+        # telefone (se preenchido)
+        if telefone and len(tel_digits) not in (10, 11):
+            errors["telefone"] = "Telefone deve ter 10 ou 11 dígitos (com DDD)."
+
+        # duplicidade (nome + telefone) ignorando o próprio registro
+        if nome_piloto:
+            q = Pilotos.query.filter(
+                db.func.lower(Pilotos.nome_piloto) == nome_piloto.lower()
+            )
+            if tel_digits:
+                q = q.filter(Pilotos.telefone == tel_digits)
+
+            q = q.filter(Pilotos.id != piloto.id)
+            existe = q.first()
+            if existe:
+                errors["nome_piloto"] = "Já existe um piloto com esse nome (e telefone)."
+
+        if errors:
+            flash("Corrija os campos destacados.", "warning")
+            return render_template("editar_piloto.html", piloto=piloto, form=form, errors=errors)
+
+        # salva
+        piloto.nome_piloto = nome_piloto
+        piloto.regiao = regiao or None
+        piloto.telefone = tel_digits or None
+
+        db.session.commit()
+
+        flash("Piloto atualizado com sucesso!", "success")
+        return redirect(url_for("main.listar_pilotos"))
+
+    return render_template("editar_piloto.html", piloto=piloto, form=form, errors=errors)
+
+
+@bp.route("/pilotos/<int:piloto_id>/deletar", methods=["POST"], endpoint="deletar_piloto")
+@login_required
+def deletar_piloto(piloto_id):
+    # Segurança: só admin
+    if getattr(current_user, "tipo_usuario", None) != "admin":
+        abort(403)
+
+    piloto = Pilotos.query.get_or_404(piloto_id)
+
+    db.session.delete(piloto)
+    db.session.commit()
+
+    flash("Piloto excluído com sucesso.", "success")
+    return redirect(url_for("main.listar_pilotos"))

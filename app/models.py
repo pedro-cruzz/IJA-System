@@ -180,3 +180,20 @@ class Clientes(db.Model):
     telefone = db.Column(db.String(20))
     email = db.Column(db.String(100), index=True)
     endereco = db.Column(db.String(255))
+
+# -------------------------------------------------------------
+# PILOTOS
+# -------------------------------------------------------------
+
+class Pilotos(db.Model):
+    __tablename__ = "pilotos"
+
+    id = db.Column(db.Integer, primary_key=True, index=True)
+
+    nome_piloto = db.Column(
+        db.String(100),
+        nullable=False,
+        index=True
+    )
+    regiao = db.Column(db.String(20))    
+    telefone = db.Column(db.String(20))    
