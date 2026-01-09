@@ -1,0 +1,232 @@
+/* -----------------------------------------
+   FULLCALENDAR – DASHBOARD OCEANO (REFINADO)
+   ----------------------------------------- */
+
+/* =========================
+   CARD BASE
+   ========================= */
+.calendar-card {
+  background: var(--color-bg-white);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(0,0,0,.06);
+  box-shadow: 0 12px 28px rgba(0,0,0,.06);
+  overflow: hidden;
+}
+
+/* =========================
+   TOOLBAR / TÍTULO
+   ========================= */
+.fc .fc-toolbar {
+  margin-bottom: 1.2rem;
+}
+
+.fc .fc-toolbar-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  letter-spacing: -.3px;
+  font-family: "Poppins", sans-serif;
+}
+
+/* =========================
+   BOTÕES DO CALENDÁRIO
+   ========================= */
+.fc .fc-button {
+  border-radius: 999px !important;
+  padding: .45rem .9rem !important;
+  font-size: .9rem !important;
+  font-weight: 600 !important;
+  border: 1px solid rgba(0,0,0,.08) !important;
+  background: var(--color-bg-white) !important;
+  color: var(--color-text-muted) !important;
+  transition: all .2s ease;
+}
+
+.fc .fc-button:hover {
+  background: rgba(59,130,246,.08) !important;
+  color: var(--color-primary) !important;
+  transform: translateY(-1px);
+}
+
+.fc .fc-button-primary.fc-button-active {
+  background: var(--color-primary) !important;
+  color: #fff !important;
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 8px 18px rgba(59,130,246,.35);
+}
+
+/* =========================
+   CABEÇALHO DOS DIAS
+   ========================= */
+.fc .fc-col-header-cell-cushion {
+  font-size: .7rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  padding: 14px 0;
+}
+
+/* =========================
+   GRID
+   ========================= */
+.fc-theme-standard .fc-scrollgrid {
+  border-radius: var(--radius-md);
+  border: 1px solid #eef2f7;
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th {
+  border-color: #eef2f7;
+}
+
+/* =========================
+   DIA ATUAL
+   ========================= */
+.fc .fc-day-today {
+  background: rgba(59,130,246,.06) !important;
+}
+
+.fc .fc-day-today .fc-daygrid-day-number {
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: 999px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+}
+
+/* =========================
+   EVENTOS
+   ========================= */
+.fc .fc-event {
+  border-radius: 10px;
+  padding: 4px 8px;
+  font-size: .82rem;
+  font-weight: 500;
+  border: none !important;
+  background: linear-gradient(
+    135deg,
+    rgba(59,130,246,.9),
+    rgba(37,99,235,.9)
+  );
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(0,0,0,.12);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.fc .fc-event:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(0,0,0,.18);
+}
+
+/* =========================
+   MOBILE UX
+   ========================= */
+#calendar .fc * {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 768px) {
+
+  #calendar .fc-toolbar {
+    flex-direction: column;
+    gap: .75rem;
+  }
+
+  #calendar .fc-toolbar-title {
+    font-size: 1.1rem;
+    text-align: center;
+  }
+
+  #calendar .fc-button {
+    padding: .65rem .9rem !important;
+    font-size: .9rem !important;
+  }
+
+  #calendar .fc-daygrid-day-frame {
+    min-height: 70px;
+  }
+
+  #calendar .fc-daygrid-event {
+    font-size: .78rem;
+    border-radius: 12px;
+  }
+}
+
+/* =========================
+   DARK MODE
+   ========================= */
+body.dark-mode .calendar-card {
+  background: #101927;
+  border-color: #233549;
+  box-shadow: 0 18px 40px rgba(0,0,0,.45);
+}
+
+body.dark-mode .fc {
+  background: #101927;
+}
+
+body.dark-mode .fc-toolbar-title,
+body.dark-mode .fc-col-header-cell-cushion {
+  color: #e8eef8 !important;
+}
+
+body.dark-mode .fc-button {
+  background: #152233 !important;
+  border-color: #233549 !important;
+  color: #e8eef8 !important;
+}
+
+body.dark-mode .fc-button:hover {
+  filter: brightness(1.15);
+}
+
+body.dark-mode .fc-day-today {
+  background: rgba(59,130,246,.15) !important;
+}
+
+body.dark-mode .fc-event {
+  background: linear-gradient(
+    135deg,
+    rgba(59,130,246,.85),
+    rgba(37,99,235,.85)
+  );
+}
+
+/* =========================
+   HEADER DA AGENDA
+   ========================= */
+.agenda-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.agenda-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+
+/* Mobile Header */
+@media (max-width: 768px) {
+  .agenda-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .agenda-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .agenda-btn {
+    flex-direction: column;
+    padding: 1rem;
+    border-radius: 18px;
+  }
+}

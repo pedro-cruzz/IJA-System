@@ -1,5 +1,6 @@
 from app import create_app, db
-from app.models import Usuario, Solicitacao
+from app.models import Usuario, Solicitacao, Pilotos, PilotoUvis
+
 from datetime import datetime # Importação adicionada para usar em Solicitacao (se necessário)
 
 app = create_app()
@@ -105,6 +106,66 @@ def verificar_banco():
             else:
                 print(f"--- Usuário Teste encontrado (ID: {teste.id}) ---")
 
+            # --- 4. GARANTE PILOTO (NOVO) ---
+            # 4.1) Garante cadastro do piloto na tabela Pilotos
+            piloto = Pilotos.query.filter_by(nome_piloto="Piloto 01").first()
+            if not piloto:
+                print("--- Criando cadastro Piloto (Pilotos)... ---")
+                piloto = Pilotos(
+                    nome_piloto="Piloto 01",
+                    regiao="OESTE",
+                    telefone="11999999999"
+                )
+                db.session.add(piloto)
+                db.session.flush()  # garante piloto.id sem precisar commit
+            else:
+                print(f"--- Piloto encontrado (ID: {piloto.id}) ---")
+
+            # 4.2) Garante usuário de login do piloto (tabela usuarios)
+            usuario_piloto = Usuario.query.filter_by(login='piloto').first()
+            if not usuario_piloto:
+                print("--- Criando usuário Piloto (login piloto)... ---")
+                usuario_piloto = Usuario(
+                    nome_uvis="Piloto 01",     # você usa nome_uvis como nome exibido
+                    regiao="OESTE",
+                    codigo_setor="P1",
+                    login="piloto",
+                    tipo_usuario="piloto",
+                    piloto_id=piloto.id
+                )
+                usuario_piloto.set_senha("1234")
+                db.session.add(usuario_piloto)
+            else:
+                # garante que está correto
+                if usuario_piloto.tipo_usuario != 'piloto':
+                    usuario_piloto.tipo_usuario = 'piloto'
+                usuario_piloto.piloto_id = piloto.id
+                print(f"--- Usuário Piloto encontrado (ID: {usuario_piloto.id}) ---")
+
+            # 4.3) (Opcional, recomendado) vincula UVIS que esse piloto atende
+            # aqui eu vou vincular as UVIS já criadas: lapa e teste
+            # se você quiser, pode remover ou trocar
+            def vincular_uvis(piloto_id, uvis_usuario_id):
+                existe = PilotoUvis.query.filter_by(
+                    piloto_id=piloto_id,
+                    uvis_usuario_id=uvis_usuario_id
+                ).first()
+                if not existe:
+                    db.session.add(PilotoUvis(
+                        piloto_id=piloto_id,
+                        uvis_usuario_id=uvis_usuario_id
+                    ))
+
+            # garante que lapa/teste existem no escopo (você cria acima)
+            if lapa and lapa.id:
+                vincular_uvis(piloto.id, lapa.id)
+
+            if teste and teste.id:
+                vincular_uvis(piloto.id, teste.id)
+
+            print("--- Vínculos Piloto ↔ UVIS garantidos ---")
+
+
 
             db.session.commit()
             print(">>> Banco de dados verificado com sucesso!")
@@ -112,18 +173,14 @@ def verificar_banco():
 
     except Exception as e:
         print(f"!!! ERRO FATAL NA VERIFICAÇÃO DO BANCO: {e}")
-
-#if __name__ == "__main__":
-    #verificar_banco()
-    # Comente ou remova as linhas abaixo para o Render:
-    # print(">>> INICIANDO SERVIDOR FLASK...")
-    #app.run(debug=True, port=5000) 
-
+ 
 if __name__ == "__main__":
 
     verificar_banco()
     # Comente ou remova as linhas abaixo para o Render:
     app.run(debug=True, host='127.0.0.1', port=5000)
+
+    app.run(host='0.0.0.0', port=5000, debug=True)
     
     # Adicione este print para você saber que ele terminou:
     print(">>> Banco de dados pronto! Passando o controle para o Gunicorn...")

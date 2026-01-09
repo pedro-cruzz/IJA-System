@@ -1,4 +1,12 @@
 {% extends "base.html" %}
+
+{% block extra_styles %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/tables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/forms.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/buttons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/chatbot.css') }}">
+{% endblock %}
+
 {% block content %}
 
 {# --- INÍCIO DO CONTAINER PADRONIZADO --- #}
@@ -7,418 +15,495 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="text-dark"><i class="bi bi-shield-lock-fill me-2 text-primary"></i> Painel de Gestão</h2>
 
-        {# 1. CONTROLE DE PERMISSÃO: BOTÕES EXPORTAR AGORA COM FORMULÁRIO #}
+        {# BOTÕES EXPORTAR #}
         <div class="d-flex gap-2">
             {% if is_editable %}
-            {# NOVO FORMULÁRIO PARA EXPORTAÇÃO EXCEL #}
             <form method="GET" action="{{ url_for('main.exportar_excel') }}" class="form-exportar p-0 m-0">
                 <input type="hidden" name="status" value="{{ request.args.get('status', '') }}">
                 <input type="hidden" name="unidade" value="{{ request.args.get('unidade', '') }}">
                 <input type="hidden" name="regiao" value="{{ request.args.get('regiao', '') }}">
 
-                <button type="submit" class="btn btn-success">
-                    <i class="bi bi-file-earmark-excel-fill"></i> Exportar Excel
+                <button type="submit" class="btn btn-success shadow-sm">
+                    <i class="bi bi-file-earmark-excel-fill"></i> <span class="d-none d-md-inline">Exportar Excel</span>
                 </button>
             </form>
             {% endif %}
         </div>
     </div>
 
-    {# --- Formulário de Filtros (Padronizado) --- #}
-    <form method="GET" class="card p-3 mb-4 shadow-sm rounded-4">
-        <div class="row g-2 align-items-end">
+    {# --- FILTROS EM "SANFONA" (Accordion) --- #}
+    <div class="card shadow-sm rounded-4 mb-4 border-0">
+        <div class="card-header border-0 p-3 d-flex justify-content-between align-items-center cursor-pointer"
+             data-bs-toggle="collapse"
+             data-bs-target="#collapseFiltros"
+             aria-expanded="false"
+             style="cursor: pointer;">
 
-            <div class="col-md-3">
-                <label class="small text-muted">Status:</label>
-                <select 
-                    name="status" 
-                    class="form-select form-select-sm mb-2"
-                >
-                    <option value="">Todos</option>
-                    <option value="PENDENTE" {{ 'selected' if request.args.get('status')=='PENDENTE' else '' }}>⚪️
-                        Pendente</option>
-                    <option value="EM ANÁLISE" {{ 'selected' if request.args.get('status')=='EM ANÁLISE' else '' }}>🟡
-                        Em Análise</option>
-                    <option value="APROVADO" {{ 'selected' if request.args.get('status')=='APROVADO' else '' }}>🟢
-                        Aprovado</option>
-                    <option value="APROVADO COM RECOMENDAÇÕES" {{ 'selected' if request.args.get('status')=='APROVADO COM RECOMENDAÇÕES' else '' }}>🟠 Aprovado c/ rec.</option>
-                    <option value="NEGADO" {{ 'selected' if request.args.get('status')=='NEGADO' else '' }}>🔴 Negado
-                    </option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="small text-muted">Unidade:</label>
-                <input type="text" name="unidade" class="form-control form-control-sm" placeholder="Nome da UVIS..."
-                    value="{{ request.args.get('unidade', '') }}">
-            </div>
-
-            <div class="col-md-3">
-                <label class="small text-muted">Região:</label>
-                <input type="text" name="regiao" class="form-control form-control-sm" placeholder="Leste, Oeste..."
-                    value="{{ request.args.get('regiao', '') }}">
-            </div>
-
-            <div class="col-md-3 d-flex gap-2">
-                <button class="btn btn-success btn-sm w-100" type="submit">
-                    <i class="bi bi-funnel"></i> Filtrar
-                </button>
-
-                {# Lógica Corrigida: Verifica se status, unidade ou regiao estão preenchidos #}
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-funnel-fill text-primary"></i>
+                <span class="text-dark">Filtros de Busca</span>
                 {% if request.args.get('status') or request.args.get('unidade') or request.args.get('regiao') %}
-                <a href="{{ url_for(request.endpoint) }}" class="btn btn-outline-secondary btn-sm w-100"
-                    title="Remover filtros">
-                    <i class="bi bi-x-lg"></i> Limpar
-                </a>
+                    <span class="badge bg-danger rounded-circle p-1" style="width: 8px; height: 8px;"></span>
                 {% endif %}
             </div>
-
+            <i class="bi bi-chevron-down text-muted"></i>
         </div>
-    </form>
 
-    {# --- Tabela de Pedidos --- #}
-    <div class="card shadow-sm border-0">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead>
-                    <tr>
-                        <th style="width: 25%">Unidade</th>
-                        <th style="width: 40%">Dados da Operação</th>
-                        {# AJUSTE DO HEADER PARA REFLETIR O TIPO DE USUÁRIO #}
-                        <th style="width: 35%">{% if is_editable %}Decisão & Ajustes{% else %}Status Atual & Protocolo{%
-                            endif %}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for p in pedidos %}
-                    <tr>
-                        <td class="align-top pt-3">
-                            <strong class="text-primary fs-6">{{ p.usuario.nome_uvis }}</strong>
-                            <br>
-                            <span class="badge bg-secondary mb-2 mt-1">{{ p.usuario.regiao }}</span>
+        <div class="collapse {% if request.args.get('status') or request.args.get('unidade') or request.args.get('regiao') %}show{% endif %}" id="collapseFiltros">
+            <div class="card-body pt-0">
+                <form method="GET">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-3">
+                            <label class="small text-muted">Status:</label>
+                            <select name="status" class="form-select form-select-sm">
+                                <option value="">Todos</option>
+                                <option value="PENDENTE" {{ 'selected' if request.args.get('status')=='PENDENTE' else '' }}>⚪️ Pendente</option>
+                                <option value="EM ANÁLISE" {{ 'selected' if request.args.get('status')=='EM ANÁLISE' else '' }}>🟡 Em Análise</option>
+                                <option value="APROVADO" {{ 'selected' if request.args.get('status')=='APROVADO' else '' }}>🟢 Aprovado</option>
+                                <option value="APROVADO COM RECOMENDAÇÕES" {{ 'selected' if request.args.get('status')=='APROVADO COM RECOMENDAÇÕES' else '' }}>🟠 Aprovado c/ rec.</option>
+                                <option value="NEGADO" {{ 'selected' if request.args.get('status')=='NEGADO' else '' }}>🔴 Negado</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="small text-muted">Unidade:</label>
+                            <input type="text" name="unidade" class="form-control form-control-sm" placeholder="Nome da UVIS..." value="{{ request.args.get('unidade', '') }}">
+                        </div>
+                       <div class="col-md-3">
+                        <label class="small text-muted">Região:</label>
 
+                        {% set reg = (request.args.get('regiao','') or '')|upper %}
 
-                            <div class="small text-muted border-top pt-2 mt-2">
-                                <i class="bi bi-calendar"></i>
-                                {{ p.data_agendamento.strftime('%d/%m/%Y') }} às {{ p.hora_agendamento.strftime('%H:%M')
-                                }}
-                                <br><br>
-
-                                <i class="bi bi-geo-alt"></i>
-                                {{ p.logradouro }}, {{ p.numero or 'S/N' }}
-                                {% if p.complemento %} <br><span class="fst-italic">({{ p.complemento }})</span> {%
-                                endif %}
-                                <br>
-                                {{ p.bairro }} - {{ p.cidade }}/{{ p.uf }}
-                                <br>
-                                CEP: {{ p.cep }}
-                            </div>
-                            {# NOVO: BOTÕES DE ADMIN/DELETAR #}
-                            {% if current_user.tipo_usuario == 'admin' %}
-                            <div class="d-flex gap-1 mt-2">
-                                <a href="{{ url_for('main.admin_editar_completo', id=p.id) }}"
-                                    class="btn btn-sm btn-success">
-                                    <i class="bi bi-pencil-square"></i> Editar
+                        <select name="regiao" class="form-select form-select-sm">
+                            <option value="">Todas</option>
+                            <option value="NORTE" {% if reg == 'NORTE' %}selected{% endif %}>NORTE</option>
+                            <option value="SUL" {% if reg == 'SUL' %}selected{% endif %}>SUL</option>
+                            <option value="LESTE" {% if reg == 'LESTE' %}selected{% endif %}>LESTE</option>
+                            <option value="OESTE" {% if reg == 'OESTE' %}selected{% endif %}>OESTE</option>
+                        </select>
+                        </div>
+                        <div class="col-md-3 d-flex gap-2">
+                            <button class="btn btn-success btn-sm w-100" type="submit"><i class="bi bi-search"></i> Buscar</button>
+                            {% if request.args.get('status') or request.args.get('unidade') or request.args.get('regiao') %}
+                                <a href="{{ url_for(request.endpoint) }}" class="btn btn-outline-secondary btn-sm w-100">
+                                    <i class="bi bi-x-lg"></i> Limpar
                                 </a>
-                                <form class="form-deletar" action="{{ url_for('main.deletar_registro', id=p.id) }}"
-                                    method="POST">
-                                    <button type="submit" class="btn btn-sm btn-danger">
-                                        <i class="bi bi-trash"></i> Deletar
-                                    </button>
-                                </form>
-                            </div>
                             {% endif %}
-                            {# FIM NOVO BOTÕES DE ADMIN/DELETAR #}
-
-                        </td>
-
-                        <td class="align-top pt-3">
-                            {# Dados da Operação - GPS #}
-                            {% if p.latitude and p.longitude %}
-                            <div class="d-flex justify-content-between align-items-center p-2 rounded mb-3 border">
-                                <div style="line-height: 1.2;">
-                                    <small class="text-muted d-block">GPS:</small>
-                                    <small class="fw-bold font-monospace ">{{ p.latitude }}, {{ p.longitude }}</small>
-                                </div>
-                                <a href="http://maps.google.com/maps?q={{ p.latitude }},{{ p.longitude }}"
-                                    target="_blank" class="btn btn-sm btn-outline-danger ms-2">
-                                    <i class="bi bi-map-fill"></i> Mapa
-                                </a>
-                            </div>
-                            {% else %}
-                            <div class="alert alert-warning py-1 px-2 small mb-3">
-                                <i class="bi bi-exclamation-triangle"></i> Sem coordenadas
-                            </div>
-                            {% endif %}
-
-                            {# Dados da Operação - Detalhes #}
-                            <div class="row g-2 small mb-2">
-                                <div class="col-6">
-                                    <span class="text-muted d-block">Tipo de Visita:</span>
-                                    <strong class="text-capitalize">{{ p.tipo_visita or '--' }}</strong>
-                                </div>
-                                <div class="col-6">
-                                    <span class="text-muted d-block">Altura Voo:</span>
-                                    <strong>{{ p.altura_voo or '--' }}</strong>
-                                </div>
-                                <div class="col-12">
-                                    <span class="text-muted d-block">Foco:</span>
-                                    <strong>{{ p.foco }}</strong>
-                                </div>
-                            </div>
-
-                            <div class="mb-3">
-                                {% if p.apoio_cet %}
-                                <span class="badge bg-warning text-dark">Apoio CET: SIM</span>
-                                {% else %}
-                                <span class="badge bg-danger text-dark">Apoio CET: NÃO</span>
-                                {% endif %}
-                            </div>
-
-                            {% if p.observacao %}
-                            <div class="p-2 border rounded small fst-italic text-muted campo-observacao">
-                                <i class="bi bi-chat-quote me-1"></i> "{{ p.observacao }}"
-                            </div>
-                            {% endif %}
-                        </td>
-
-                        <td class="align-top pt-3 bg-opacity-50">
-
-                            {# FORMULÁRIO DE ATUALIZAÇÃO (Será pego pelo listener universal do BASE.HTML) #}
-                            {% if is_editable %}
-                            
-                            <form
-                                action="{{ url_for('main.atualizar', id=p.id) }}"
-                                method="POST"
-                                enctype="multipart/form-data"
-                            >
-                                
-                                <div class="row g-1 mb-2">
-                                    <div class="col-12"><label class="small fw-bold text-muted">Ajuste GPS (Lat / Long)</label></div>
-                                    <div class="col-6">
-                                        <input name="latitude" class="form-control form-control-sm font-monospace"
-                                            placeholder="Lat" value="{{ p.latitude or '' }}">
-                                    </div>
-                                    <div class="col-6">
-                                        <input name="longitude" class="form-control form-control-sm font-monospace"
-                                            placeholder="Long" value="{{ p.longitude or '' }}">
-                                    </div>
-                                </div>
-                                
-                                <label class="small fw-bold text-muted">Protocolo DECEA</label>
-                                <input name="protocolo" class="form-control form-control-sm font-monospace mb-2"
-                                    placeholder="BR-2025-XXXX" value="{{ p.protocolo or '' }}">
-
-                                <div class="p-2 border rounded">
-                                    <label class="small fw-bold text-muted">Status</label>
-                                    <select 
-                                        name="status" 
-                                        class="form-select form-select-sm mb-2"
-                                        onchange="toggleJustificativa(this, '{{ p.id }}')"
-                                    >
-                                        <option value="PENDENTE" {% if p.status=='PENDENTE' %}selected{% endif %}>⚪️
-                                            Pendente</option>
-                                        <option value="EM ANÁLISE" {% if p.status=='EM ANÁLISE' %}selected{% endif %}>🟡
-                                            Em Análise</option>
-                                        <option value="APROVADO" {% if p.status=='APROVADO' %}selected{% endif %}>🟢
-                                            Aprovar</option>
-                                        <option value="APROVADO COM RECOMENDAÇÕES" {% if p.status=='APROVADO COM RECOMENDAÇÕES' %}selected{% endif %}>🟠 Aprovado c/ recomendações</option>
-                                        <option value="NEGADO" {% if p.status=='NEGADO' %}selected{% endif %}>🔴 Negar
-                                        </option>
-                                    </select>
-
-                                    <div
-                                        class="mb-3"
-                                        id="boxJustificativa{{ p.id }}"
-                                        style="display: none;"
-                                    >
-                                        <label class="small fw-bold text-muted mb-1">
-                                            Justificativa (obrigatória se negar)
-                                        </label>
-
-                                        <input
-                                            name="justificativa"
-                                            id="inputJustificativa{{ p.id }}"
-                                            class="form-control form-control-sm"
-                                            value="{{ p.justificativa or '' }}"
-                                            placeholder="Digite a justificativa..."
-                                        >
-                                    </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
 
-                                    <div class="mb-3">
-                                        <label class="small fw-bold text-muted mb-1">Anexo (PDF)</label>
+    {# --- TABELA HÍBRIDA (SANFONA NO MOBILE / TABELA NO PC) --- #}
+    <div class="card shadow-sm rounded-4 border-0 overflow-hidden">
+        <table class="table table-hover align-middle mb-0 table-accordion">
 
-                                        <div class="d-flex align-items-center gap-2">
+            {# HEADER: OCULTO NO MOBILE (d-none), VISÍVEL NO DESKTOP (d-lg-table-header-group) #}
+            <thead class="d-none d-lg-table-header-group">
+                <tr>
+                    <th style="width: 25%">Unidade</th>
+                    <th style="width: 40%">Dados da Operação</th>
+                    <th style="width: 35%">{% if is_editable %}Decisão & Ajustes{% else %}Status Atual & Protocolo{% endif %}</th>
+                </tr>
+            </thead>
 
-                                            <label id="btnAnexo{{ p.id }}" for="inputPdf{{ p.id }}" class="btn btn-sm btn-outline-primary w-100">
-                                                <span id="textoDisplay{{ p.id }}" class="text-truncate">
-                                                    <i class="bi bi-paperclip me-2"></i>
-                                                    {{ p.anexo_nome or 'Anexar arquivo' }}
-                                                </span>
-                                            </label>
+            <tbody>
+                {% for p in pedidos %}
 
-                                            <a
-                                                id="btnVisualizar{{ p.id }}"
-                                                href="{{ url_for('main.baixar_anexo', id=p.id) if p.anexo_path else '#' }}"
-                                                target="_blank"
-                                                class="btn btn-sm btn-outline-primary {% if not p.anexo_path %}d-none{% endif %}"
-                                            >
-                                                <i class="bi bi-eye"></i>
-                                            </a>
+                {# === LINHA PRINCIPAL (CABEÇALHO DA SANFONA NO MOBILE / LINHA COMUM NO PC) === #}
+                <tr class="main-row"
+                        onclick="
+                        if(event.target.closest('a, button, form, label, input, select, textarea')) return;
+                        bootstrap.Collapse.getOrCreateInstance(
+                            document.getElementById('accordion{{ p.id }}')
+                        ).toggle();                       "
+                >
+                    {# COLUNA 1: IDENTIFICAÇÃO (SEMPRE VISÍVEL) #}
+                    <td class="ps-3 py-3 m-0 align-top">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="d-flex flex-column">
 
-                                            <button
-                                                id="btnRemover{{ p.id }}"
-                                                type="button"
-                                                class="btn btn-sm btn-outline-danger {% if not p.anexo_path %}d-none{% endif %}"
-                                                onclick="removerPdf('{{ p.id }}')"
-                                            >
-                                                <i class="bi bi-x"></i>
-                                            </button>
+                                <!-- NOME -->
+                                <strong class="text-primary fs-6">
+                                    {{ p.usuario.nome_uvis }}
+                                </strong>
 
-                                            <input
-                                                type="file"
-                                                name="anexo"
-                                                id="inputPdf{{ p.id }}"
-                                                class="d-none"
-                                            accept="
-                                                application/pdf,
-                                                image/png,
-                                                image/jpeg,
-                                                application/msword,
-                                                application/vnd.openxmlformats-officedocument.wordprocessingml.document,
-                                                application/vnd.ms-excel,
-                                                application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                                                onchange="processarArquivo(this, '{{ p.id }}')"
-                                            >
-                                        </div>
-                                    </div>
-
-
-                                <div class="d-grid mt-2">
-                                    <button type="submit" class="btn btn-primary btn-sm rounded-pill shadow-sm" id="btnSalvar{{ p.id }}">
-                                        <i class="bi bi-check-lg me-1"></i>Salvar Decisão
-                                    </button>
-                                </div>
-
-                            </form>
-                            
-                            {# CONTEÚDO SOMENTE LEITURA PARA 'VISUALIZAR' #}
-                            {% else %}
-
-                            <div class="p-3 border rounded">
-                                <label class="small fw-bold text-muted">Status Atual:</label>
-                                <div class="text-center mb-3">
+                                <!-- STATUS -->
+                                <div class="mt-1">
                                     <span class="badge
                                         {% if p.status=='PENDENTE' %}bg-secondary
                                         {% elif p.status=='EM ANÁLISE' %}bg-warning
+                                        {% elif p.status=='APROVADO COM RECOMENDAÇÕES' %}bg-recomended
                                         {% elif p.status=='APROVADO' %}bg-success
-                                        {% elif p.status=='APROVADO COM RECOMENDAÇÕES' %}bg-info
                                         {% elif p.status=='NEGADO' %}bg-danger
-                                        {% endif %}
-                                        fs-6 p-2">
+                                        {% else %}bg-warning text-dark{% endif %}">
                                         {{ p.status }}
                                     </span>
                                 </div>
 
-                                <label class="small fw-bold text-muted">Protocolo DECEA:</label>
-                                <div class="mb-2 p-1 border rounded font-monospace small">
-                                    {{ p.protocolo or 'N/A' }}
+                                <!-- REGIÃO -->
+                                <div class="mt-1">
+                                    <span class="badge bg-secondary">
+                                        {{ p.usuario.regiao }}
+                                    </span>
                                 </div>
 
-                                <label class="small fw-bold text-muted">Justificativa (se houver):</label>
-                                <div class="small p-1 border rounded fst-italic text-muted">
-                                    {{ p.justificativa or 'Nenhuma' }}
-                                </div>
                             </div>
 
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="3" class="text-center py-5 text-muted">
-                            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                            Nenhum pedido encontrado.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {# --- Paginação --- #}
-            {% if paginacao.pages > 1 %}
-            <nav aria-label="Navegação" class="mt-4 pb-3">
-                <ul class="pagination justify-content-center">
-                    <li class="page-item {% if not paginacao.has_prev %}disabled{% endif %}">
-                        <a class="page-link"
-                            href="{{ url_for('main.admin_dashboard', page=paginacao.prev_num, status=request.args.get('status'), unidade=request.args.get('unidade'), regiao=request.args.get('regiao')) }}">Anterior</a>
-                    </li>
-                    <li class="page-item disabled"><a class="page-link">Página {{ paginacao.page }} de {{
-                            paginacao.pages }}</a></li>
-                    <li class="page-item {% if not paginacao.has_next %}disabled{% endif %}">
-                        <a class="page-link"
-                            href="{{ url_for('main.admin_dashboard', page=paginacao.next_num, status=request.args.get('status'), unidade=request.args.get('unidade'), regiao=request.args.get('regiao')) }}">Próxima</a>
-                    </li>
-                </ul>
-            </nav>
-            {% endif %}
-        </div>
-    </div>
+                            <!-- SETA MOBILE -->
+                            <i class="bi bi-chevron-down text-muted d-lg-none p-2"></i>
+                        </div>
 
+                        <div class="small text-muted mt-3 border-top pt-2">
+                            <i class="bi bi-calendar-event me-1"></i> {{ p.data_agendamento.strftime('%d/%m/%Y') }} às {{ p.hora_agendamento.strftime('%H:%M') }}
+                        </div>
+
+                        {# Endereço Desktop (Escondido no Mobile) #}
+                        <div class="d-none d-lg-block mt-2 small text-muted">
+                            <i class="bi bi-geo-alt"></i> {{ p.logradouro }}, {{ p.numero or 'S/N' }} - {{ p.bairro }}
+                            <br>CEP: {{ p.cep }}
+                        </div>
+
+                        {# Botões de Admin Desktop #}
+                        {% if current_user.tipo_usuario == 'admin' %}
+                        <div class="d-none d-lg-flex gap-1 mt-4">
+                            <a href="{{ url_for('main.admin_editar_completo', id=p.id) }}"
+                                class="btn btn-sm btn-success"
+                                onclick="event.stopPropagation();">
+                                <i class="bi bi-pencil-square"></i> Editar
+                            </a>
+                            <form class="form-deletar"
+                                action="{{ url_for('main.deletar_registro', id=p.id) }}"
+                                method="POST"
+                                onclick="event.stopPropagation();">
+                                <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i> Deletar</button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </td>
+
+                    {# COLUNA 2: DADOS (SÓ DESKTOP) #}
+                    <td class="align-top pt-3 d-none d-lg-table-cell">
+                        {% if p.latitude %}
+                        <div class="d-flex justify-content-between p-2 rounded border mb-2">
+                            <small class="font-monospace fw-bold">{{ p.latitude }}, {{ p.longitude }}</small>
+                            <a href="http://maps.google.com/maps?q={{ p.latitude }},{{ p.longitude }}" target="_blank" class="btn btn-sm btn-outline-danger py-0"><i class="bi bi-map-fill"></i></a>
+                        </div>
+                        {% endif %}
+                        <div class="row gap-2 small mt-2">
+                            <div class="col-6"><span>Tipo:</span> <strong>{{ p.tipo_visita }}</strong></div>
+                            <div class="col-6"><span>Altura:</span> <strong>{{ p.altura_voo }}</strong></div>
+                            <div class="col-12"><span>Foco:</span> <strong>{{ p.foco }}</strong></div>
+                            <div class="col-6 mt-2">
+                                <span>Apoio CET?</span>
+                                {% if p.apoio_cet %}
+                                    <div class="mt-1">
+                                        <span class="badge bg-success text-light">Sim</span>
+                                    </div>
+                                {% else %}
+                                    <div class="mt-1">
+                                        <span class="badge bg-danger text-light">Não</span>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <span>Observação</span>
+                            {% if p.observacao %}
+                            <div class=" p-1 border rounded fst-italic small">
+                                {{ p.observacao }}
+                            </div>{% endif %}</div>
+                        
+                    </td>
+
+                    {# COLUNA 3: FORMULÁRIO (SÓ DESKTOP) #}
+                    <td class="align-top pt-3 d-none d-lg-table-cell bg-opacity-10">
+                        {% if is_editable %}
+                            {# --- FORMULÁRIO DESKTOP ORIGINAL --- #}
+                            <form action="{{ url_for('main.atualizar', id=p.id) }}" method="POST" enctype="multipart/form-data">
+                                <div class="row g-1 mb-2">
+                                    <div class="col-6"><input name="latitude" class="form-control form-control-sm" value="{{ p.latitude or '' }}" placeholder="Lat"></div>
+                                    <div class="col-6"><input name="longitude" class="form-control form-control-sm" value="{{ p.longitude or '' }}" placeholder="Long"></div>
+                                </div>
+                                <input name="protocolo" class="form-control form-control-sm mb-2" placeholder="Protocolo" value="{{ p.protocolo or '' }}">
+                                <div class="p-2 border rounded gap-1 d-flex flex-column">
+                                    <div>
+                                        <label class="form-label">Status</label>
+                                    <select name="status"
+                                            class="form-select form-select-sm"
+                                            data-jid="{{ p.id }}"
+                                            onchange="toggleJustificativa(this, this.dataset.jid)">
+                                        <option value="PENDENTE" {% if p.status=='PENDENTE' %}selected{% endif %}>⚪️ Pendente</option>
+                                        <option value="EM ANÁLISE" {% if p.status=='EM ANÁLISE' %}selected{% endif %}>🟡 Em Análise</option>
+                                        <option value="APROVADO COM RECOMENDAÇÕES" {% if p.status=='APROVADO COM RECOMENDAÇÕES' %}selected{% endif %}>🟠 Aprovado com Recomendações</option>
+                                        <option value="APROVADO" {% if p.status=='APROVADO' %}selected{% endif %}>🟢 Aprovar</option>
+                                        <option value="NEGADO" {% if p.status=='NEGADO' %}selected{% endif %}>🔴 Negar</option>
+                                    </select>
+                                    </div>
+                                    <div>
+                                        <label class="form-label mt-2">Piloto responsável</label>
+                                        <select class="form-select form-select-sm" name="piloto_id" {% if not is_editable %}disabled{% endif %}>
+                                            {# ✅ opção para LIMPAR #}
+                                            <option value="" {% if not p.piloto_id %}selected{% endif %}>— Sem piloto (remover atribuição) —</option>
+
+                                            {# (opcional) separador visual #}
+                                            <option value="" disabled>────────────</option>
+
+                                            {# lista normal #}
+                                            {% for pilot in pilotos %}
+                                                <option value="{{ pilot.id }}" {% if p.piloto_id == pilot.id %}selected{% endif %}>
+                                                {{ pilot.nome_piloto }}{% if pilot.regiao %} ({{ pilot.regiao }}){% endif %}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div id="boxJustificativa{{ p.id }}" style="display: none;" class="">
+                                        <label class="form-label mt-2">Justificativa</label>
+                                        <input name="justificativa" id="inputJustificativa{{ p.id }}" class="form-control form-control-sm" value="{{ p.justificativa or '' }}" placeholder="Justificativa">
+                                    </div>
+
+                                    <div class="d-flex gap-1 mt-2">
+                                        <label id="btnAnexo{{ p.id }}" for="inputPdf{{ p.id }}" class="btn btn-sm btn-outline-primary text-truncate justify-content-center vw-100">
+                                            <span id="textoDisplay{{ p.id }}"><i class="bi bi-paperclip"></i> {{ p.anexo_nome or 'Anexar' }}</span>
+                                        </label>
+                                        <a id="btnVisualizar{{ p.id }}"
+                                           href="{{ url_for('main.baixar_anexo', id=p.id) if p.anexo_path else '#' }}"
+                                           target="_blank"
+                                           class="btn btn-sm btn-outline-primary {% if not p.anexo_path %}d-none{% endif %}">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <button type="submit"
+                                                form="formRemoverAnexo{{ p.id }}"
+                                                class="btn btn-sm btn-outline-danger {% if not p.anexo_path %}d-none{% endif %}"
+                                                id="btnRemover{{ p.id }}">
+                                            <i class="bi bi-x"></i>
+                                        </button>
+                                    </div>
+
+                                    <input type="file" name="anexo" id="inputPdf{{ p.id }}" class="d-none" onchange="processarArquivo(this, '{{ p.id }}')">
+
+                                    <button type="submit" class="btn btn-primary btn-sm w-100 mt-2">Salvar</button>
+                                </div>
+                            </form>
+
+                            {# Form Fantasma Remover Desktop #}
+                            {% if p.anexo_path %}
+                            <form action="{{ url_for('main.remover_anexo', id=p.id) }}"
+                                  method="POST"
+                                  class="form-deletar d-none"
+                                  id="formRemoverAnexo{{ p.id }}"></form>
+                            {% endif %}
+                        {% else %}
+                            <div class="text-center"><span class="badge bg-secondary">{{ p.status }}</span></div>
+                        {% endif %}
+                    </td>
+                </tr>
+
+                {# === LINHA 2: SANFONA DETALHES (SÓ MOBILE) === #}
+                <tr class="d-lg-none p-0 border-0">
+                    <td colspan="3" class="p-0 border-0">
+                        <div class="collapse" id="accordion{{ p.id }}">
+                            <div class="p-3 border-bottom">
+
+                                {# --- 1. DADOS COMPLETOS MOBILE --- #}
+                                <div class="p-3 rounded border mb-3">
+                                    <h6 class="small fw-bold text-muted mb-2 text-uppercase">Detalhes</h6>
+                                    <p class="small text-dark mb-2">{{ p.logradouro }}, {{ p.numero }} - {{ p.bairro }}</p>
+
+                                    {% if p.latitude and p.longitude %}
+                                    <div class="rounded p-2 mb-2">
+                                        <div class="small text-muted mb-1">
+                                            <i class="bi bi-crosshair text-danger me-1"></i> Coordenadas
+                                        </div>
+                                        <div class="fw-bold font-monospace text-dark">
+                                            {{ p.latitude }}, {{ p.longitude }}
+                                        </div>
+                                    </div>
+                                    <div class="d-grid mb-3">
+                                        <a href="http://maps.google.com/maps?q={{ p.latitude }},{{ p.longitude }}" target="_blank" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-map-fill text-danger me-2"></i> Ver no Mapa
+                                        </a>
+                                    </div>
+                                    {% endif %}
+
+                                    <div class="row g-2 small text-muted">
+                                        <div class="col-6"><strong>Tipo:</strong> {{ p.tipo_visita }}</div>
+                                        <div class="col-6"><strong>Alt:</strong> {{ p.altura_voo }}</div>
+                                        <div class="col-6"><strong>Foco:</strong> {{ p.foco }}</div>
+                                        <div class="col-6">
+                                            <span>Apoio CET?</span>
+                                            {% if p.apoio_cet %}
+                                                <div class="mt-1">
+                                                    <span class="badge bg-success text-light">Sim</span>
+                                                </div>
+                                            {% else %}
+                                                <div class="mt-1">
+                                                    <span class="badge bg-danger text-light">Não</span>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% if p.observacao %}<div class="alert alert-warning small p-2 mt-2 mb-0">{{ p.observacao }}</div>{% endif %}
+                                </div>
+
+                                {# --- 2. FORMULÁRIO MOBILE (Cópia adaptada para Mobile) --- #}
+                                {% if is_editable %}
+                                <div class="p-3 rounded border shadow-sm">
+                                    <h6 class="small fw-bold text-primary mb-3 text-uppercase">Tomar Decisão</h6>
+
+                                    <form action="{{ url_for('main.atualizar', id=p.id) }}" method="POST" enctype="multipart/form-data">
+                                        <div class="d-none">
+                                            <input name="latitude" value="{{ p.latitude }}">
+                                            <input name="longitude" value="{{ p.longitude }}">
+                                        </div>
+                                        <input name="protocolo" class="form-control mb-3" placeholder="Protocolo DECEA" value="{{ p.protocolo or '' }}">
+                                        <label class="form-label mt-2">Piloto responsável</label>
+                                        <select class="form-select form-select-sm" name="piloto_id" {% if not is_editable %}disabled{% endif %}>
+                                            {# ✅ opção para LIMPAR #}
+                                            <option value="" {% if not p.piloto_id %}selected{% endif %}>— Sem piloto (remover atribuição) —</option>
+
+                                            {# (opcional) separador visual #}
+                                            <option value="" disabled>────────────</option>
+
+                                            {# lista normal #}
+                                            {% for pilot in pilotos %}
+                                                <option value="{{ pilot.id }}" {% if p.piloto_id == pilot.id %}selected{% endif %}>
+                                                {{ pilot.nome_piloto }}{% if pilot.regiao %} ({{ pilot.regiao }}){% endif %}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+
+                                        <label class="form-label mt-2">Piloto responsável</label>
+                                        <select name="status"
+                                                class="form-select mb-3"
+                                                data-jid="{{ p.id }}_mob"
+                                                onchange="toggleJustificativa(this, this.dataset.jid)">
+                                            <option value="PENDENTE" {% if p.status=='PENDENTE' %}selected{% endif %}>⚪️ Pendente</option>
+                                            <option value="EM ANÁLISE" {% if p.status=='EM ANÁLISE' %}selected{% endif %}>🟡 Em Análise</option>
+                                            <option value="APROVADO" {% if p.status=='APROVADO' %}selected{% endif %}>🟢 Aprovar</option>
+                                            <option value="APROVADO COM RECOMENDAÇÕES" {% if p.status=='APROVADO COM RECOMENDAÇÕES' %}selected{% endif %}>🟠 Aprovado com Recomendações</option>
+                                            <option value="NEGADO" {% if p.status=='NEGADO' %}selected{% endif %}>🔴 Negar</option>
+                                        </select>
+
+                                        <div id="boxJustificativa{{ p.id }}_mob" style="display: none;" class="mb-3">
+                                            <textarea name="justificativa" id="inputJustificativa{{ p.id }}_mob" class="form-control" rows="2" placeholder="Motivo...">{{ p.justificativa }}</textarea>
+                                        </div>
+
+                                        <div class="anexo-actions mb-3">
+                                            <label id="btnAnexo{{ p.id }}_mob"
+                                                   for="inputPdf{{ p.id }}_mob"
+                                                   class="btn btn-outline-primary btn-sm btn-anexo">
+                                                <span id="textoDisplay{{ p.id }}_mob">
+                                                    {{ p.anexo_nome or 'Anexar' }}
+                                                </span>
+                                            </label>
+
+                                            {% if p.anexo_path %}
+                                            <a id="btnVisualizar{{ p.id }}_mob"
+                                               href="{{ url_for('main.baixar_anexo', id=p.id) if p.anexo_path else '#' }}"
+                                               target="_blank"
+                                               class="btn btn-sm btn-outline-primary {% if not p.anexo_path %}d-none{% endif %}">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+
+                                            <button type="submit"
+                                                    form="formRemoverAnexo{{ p.id }}_mob"
+                                                    class="btn btn-sm btn-outline-danger {% if not p.anexo_path %}d-none{% endif %}"
+                                                    id="btnRemover{{ p.id }}_mob">
+                                                <i class="bi bi-x"></i>
+                                            </button>
+                                            {% endif %}
+                                        </div>
+
+                                        <input type="file" name="anexo" id="inputPdf{{ p.id }}_mob" class="d-none" onchange="processarArquivo(this, '{{ p.id }}_mob')">
+
+                                        <button type="submit" class="btn btn-primary w-100 fw-bold py-2">Salvar Decisão</button>
+                                    </form>
+
+                                    {# Form Fantasma Remover Mobile (se existir anexo) #}
+                                    {% if p.anexo_path %}
+                                    <form action="{{ url_for('main.remover_anexo', id=p.id) }}"
+                                          method="POST"
+                                          class="form-deletar d-none"
+                                          id="formRemoverAnexo{{ p.id }}_mob"></form>
+                                    {% endif %}
+
+                                    {% if current_user.tipo_usuario == 'admin' %}
+                                    <div class="d-flex gap-1 mt-2 align-items-center justify-content-center">
+                                        <a href="{{ url_for('main.admin_editar_completo', id=p.id) }}"
+                                           class="btn btn-sm btn-success">
+                                            <i class="bi bi-pencil-square"></i> Editar
+                                        </a>
+                                        <form class="form-deletar" action="{{ url_for('main.deletar_registro', id=p.id) }}"
+                                              method="POST">
+                                            <button type="submit" class="btn btn-sm btn-danger">
+                                                <i class="bi bi-trash"></i> Deletar
+                                            </button>
+                                        </form>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+
+                {% else %}
+                <tr><td colspan="3" class="text-center py-5">Nenhum registro.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {# --- PAGINAÇÃO (MANTIDA IGUAL) --- #}
+        {% if paginacao.pages > 1 %}
+        <nav class="mt-4 pb-3">
+            <ul class="pagination justify-content-center">
+                <li class="page-item {% if not paginacao.has_prev %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('main.admin_dashboard', page=paginacao.prev_num) }}">Anterior</a>
+                </li>
+                <li class="page-item disabled"><span class="page-link">{{ paginacao.page }} / {{ paginacao.pages }}</span></li>
+                <li class="page-item {% if not paginacao.has_next %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('main.admin_dashboard', page=paginacao.next_num) }}">Próxima</a>
+                </li>
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
 </div>
 {# --- FIM DO CONTAINER PADRONIZADO --- #}
 
-
+{# --- CHATBOT (Mantido igual) --- #}
 {% if current_user.tipo_usuario == 'admin' %}
-
 <button id="adminBotFab" class="bot-fab" title="Ajuda do painel" onclick="toggleAdminChat()">
     <i class="bi bi-robot"></i>
 </button>
 
 <div id="adminBotWindow" class="chat-window">
-
     <div class="bot-header">
         <div class="bot-title">
             <i class="bi bi-robot fs-5"></i>
-            <div>
-                Ajuda do Painel
-                <span class="bot-badge ms-1">FAQ Admin</span>
-            </div>
+            <div>Ajuda do Painel <span class="bot-badge ms-1">FAQ Admin</span></div>
         </div>
-
         <div class="d-flex gap-2">
-            <button id="adminBotClear" class="btn-close-chat" title="Limpar conversa" style="font-size: 1rem;">
-                <i class="bi bi-trash"></i>
-            </button>
-
-            <button id="adminBotClose" class="btn-close-chat" onclick="toggleAdminChat()">
-                <i class="bi bi-x-lg"></i>
-            </button>
+            <button id="adminBotClear" class="btn-close-chat" title="Limpar"><i class="bi bi-trash"></i></button>
+            <button id="adminBotClose" class="btn-close-chat"><i class="bi bi-x-lg"></i></button>
         </div>
     </div>
-
     <div class="bot-body">
-
-        <div id="adminBotMessages" class="d-flex flex-column gap-2 mb-3">
-            <div class="message bot">
-                <strong>Olá, Admin!</strong><br>
-                Pergunte sobre filtros, exportações, agenda ou UVIS.
-            </div>
-        </div>
-
+        <div id="adminBotMessages" class="d-flex flex-column gap-2 mb-3"></div>
         <div class="chips-container mt-auto">
             <button class="chip" data-q="Como filtrar por status/unidade?">Filtros</button>
+            <button class="chip" data-q="suporte">Suporte</button>
             <button class="chip" data-q="Como salvar decisão?">Salvar decisão</button>
             <button class="chip" data-q="Como exportar Excel?">Exportar Excel</button>
-            <button class="chip" data-q="Como funciona Agenda?">Agenda</button>
-            <button class="chip" data-q="Como gerenciar UVIS?">UVIS</button>
         </div>
     </div>
-
     <div class="bot-footer">
         <input id="adminBotInput" type="text" placeholder="Digite sua dúvida..." autocomplete="off">
-        <button id="adminBotSend" class="btn-send" title="Enviar">
-            <i class="bi bi-send-fill"></i>
-        </button>
+        <button id="adminBotSend" class="btn-send"><i class="bi bi-send-fill"></i></button>
     </div>
 </div>
 {% endif %}
@@ -427,423 +512,136 @@
 
 {% block scripts %}
 <script>
-    // ===================================
-    // CHATBOT ADMIN
+    // --- LÓGICA DE INTERFACE DE ARQUIVO ---
+    function processarArquivo(input, id) {
+        if (!input.files || !input.files.length) return;
 
+        const file = input.files[0];
 
-    (function () {
-        // --- TRAVA DE SEGURANÇA ---
-        // Se o chat já foi iniciado, não faz nada.
-        if (window.ADMIN_CHAT_INIT) return;
-        window.ADMIN_CHAT_INIT = true;
-        // --------------------------
+        const texto = document.getElementById('textoDisplay' + id);
+        const btnVisualizar = document.getElementById('btnVisualizar' + id);
+        const btnRemover = document.getElementById('btnRemover' + id);
 
-        const API_URL = "{{ url_for('main.admin_chatbot') }}";
+        const url = URL.createObjectURL(file);
 
-        const fab = document.getElementById("adminBotFab");
-        const chatWindow = document.getElementById("adminBotWindow");
-        const box = document.getElementById("adminBotMessages");
-        const input = document.getElementById("adminBotInput");
-        const send = document.getElementById("adminBotSend");
-        const clearBtn = document.getElementById("adminBotClear");
-        const closeBtns = document.querySelectorAll("#adminBotClose");
-
-        function toggleChat() {
-            chatWindow.classList.toggle('active');
-            if (chatWindow.classList.contains('active')) {
-                setTimeout(() => {
-                    input.focus();
-                    welcome();
-                }, 300);
-            }
+        if (texto) {
+            texto.innerHTML = `<i class="bi bi-paperclip me-1"></i> ${file.name}`;
         }
 
-        // Event Listeners (agora protegidos pela trava acima)
-        if (fab) fab.addEventListener("click", toggleChat);
-        closeBtns.forEach(btn => btn.addEventListener("click", toggleChat));
-
-        function nowTime() {
-            const d = new Date();
-            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if (btnVisualizar) {
+            btnVisualizar.href = url;
+            btnVisualizar.classList.remove('d-none');
         }
 
-        function addMsg(text, who = "bot") {
-            const divMsg = document.createElement("div");
-            const cssClass = who === "me" ? "user" : "bot";
-            divMsg.className = `message ${cssClass}`;
-            divMsg.innerHTML = text;
-            box.appendChild(divMsg);
-            box.scrollTop = box.scrollHeight;
+        if (btnRemover) {
+            btnRemover.classList.remove('d-none');
         }
-
-        function addTyping() {
-            const div = document.createElement("div");
-            div.id = "botTypingRow";
-            div.className = "message bot";
-            div.innerHTML = '<span class="typing-dots">...</span>';
-            box.appendChild(div);
-            box.scrollTop = box.scrollHeight;
-        }
-
-        function removeTyping() {
-            const el = document.getElementById("botTypingRow");
-            if (el) el.remove();
-        }
-
-        async function ask(customText) {
-            const msg = (customText ?? input.value ?? "").trim();
-            if (!msg) return;
-
-            addMsg(msg, "me");
-            input.value = "";
-            input.focus();
-
-            if (send) send.disabled = true;
-            addTyping();
-
-            try {
-                const r = await fetch(API_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ message: msg })
-                });
-
-                const data = await r.json().catch(() => ({}));
-                removeTyping();
-
-                if (!r.ok) {
-                    addMsg(data.answer || "Erro ao consultar.", "bot");
-                } else {
-                    addMsg(data.answer || "Não consegui responder.", "bot");
-                }
-            } catch (e) {
-                removeTyping();
-                addMsg("Falha de conexão.", "bot");
-            } finally {
-                if (send) send.disabled = false;
-                setTimeout(() => input.focus(), 100);
-            }
-        }
-
-        function welcome() {
-            if (box.dataset.welcome) return;
-            box.dataset.welcome = "1";
-            if (box.children.length > 0) return;
-
-            addMsg(
-                "<strong>Olá!</strong> Posso te ajudar com o painel?<br><br>" +
-                "Tente clicar nos botões abaixo ou pergunte sobre filtros e agenda.",
-                "bot"
-            );
-        }
-
-        if (send) send.addEventListener("click", () => ask());
-
-        if (input) input.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") ask();
-        });
-
-        document.querySelectorAll(".chip").forEach(btn => {
-            // REMOVE qualquer listener anterior para evitar duplicação em re-renders parciais
-            const newBtn = btn.cloneNode(true);
-            btn.parentNode.replaceChild(newBtn, btn);
-
-            newBtn.addEventListener("click", () => {
-                const question = newBtn.getAttribute('data-q');
-                ask(question);
-            });
-        });
-
-        if (clearBtn) clearBtn.addEventListener("click", () => {
-            box.innerHTML = "";
-            delete box.dataset.welcome;
-            welcome();
-        });
-
-    })();
-
-    // ===================================
-    // 1. Lógica de Loading para Exportação
-    // ===================================
-
-    document.querySelectorAll('.form-exportar').forEach(form => {
-        form.addEventListener('submit', function (e) {
-            const submitButton = this.querySelector('button[type="submit"]');
-
-            if (submitButton) {
-                const clickedButton = submitButton;
-
-                // O loading já foi aplicado pelo base.html (listener universal)
-
-                setTimeout(() => {
-                    // Verifica se a função global está disponível antes de chamar
-                    if (typeof hideLoadingState === 'function') {
-                        hideLoadingState(clickedButton);
-                    }
-                }, 2000); // 4 segundos
-
-                // O formulário submete e inicia o download.
-            }
-        });
-    });
-
-    // ===================================
-    // 2. Lógica Customizada para DELEÇÃO
-    // ===================================
-    document.querySelectorAll('.form-deletar').forEach(form => {
-        form.addEventListener('submit', function (e) {
-            e.preventDefault();
-
-            // Checagem do Dark Mode (do base.html)
-            const isDarkMode = document.body.classList.contains('dark-mode');
-            // Pega o botão de submit para aplicar o loading depois
-            const submitButton = form.querySelector('button[type="submit"]');
-
-            Swal.fire({
-                title: 'Tem certeza?',
-                text: "Você está prestes a DELETAR PERMANENTEMENTE este registro.",
-                icon: 'warning',
-
-                // Aplicação da classe Dark Mode no modal
-                customClass: {
-                    popup: isDarkMode ? 'swal2-dark-mode' : '',
-                },
-
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Sim, deletar!',
-                cancelButtonText: 'Cancelar'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    // ✅ ATIVAÇÃO DO LOADING: Chama a função antes de enviar
-                    if (typeof showLoadingState === 'function') {
-                        showLoadingState(submitButton);
-                    }
-
-                    form.submit();
-                }
-            });
-        });
-    });
-
-    
-    // =========================================
-    // 3. Lógica de remover Anexo PDF
-    // =========================================
-
-    // URL gerada pelo Flask (id dummy = 0)
-    const URL_REMOVER_ANEXO = "{{ url_for('main.remover_anexo', id=0) }}";
-    
-    
-function removerPdf(id) {
-
-    // Checagem do Dark Mode (do base.html)
-    const isDarkMode = document.body.classList.contains('dark-mode');
-
-    Swal.fire({
-        title: 'Tem certeza?',
-        text: 'Você está prestes a REMOVER PERMANENTEMENTE o PDF anexado.',
-        icon: 'warning',
-
-        customClass: {
-            popup: isDarkMode ? 'swal2-dark-mode' : '',
-        },
-
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Sim, remover!',
-        cancelButtonText: 'Cancelar',
-
-        showLoaderOnConfirm: true,
-        preConfirm: () => {
-            const url = URL_REMOVER_ANEXO.replace('/0', '/' + id);
-
-            return fetch(url, {
-                method: 'POST',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            }).then(response => {
-                if (!response.ok) {
-                    throw new Error('Erro ao remover anexo');
-                }
-            });
-        },
-
-        allowOutsideClick: () => !Swal.isLoading()
-
-    }).then((result) => {
-
-        if (result.isConfirmed) {
-            Swal.fire({
-                icon: 'success',
-                title: 'Removido!',
-                text: 'O PDF foi removido com sucesso.',
-                timer: 1200,
-                showConfirmButton: false,
-                customClass: {
-                    popup: isDarkMode ? 'swal2-dark-mode' : '',
-                }
-            }).then(() => {
-                location.reload();
-            });
-        }
-
-    }).catch(() => {
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: 'Não foi possível remover o PDF.',
-            customClass: {
-                popup: isDarkMode ? 'swal2-dark-mode' : '',
-            }
-        });
-    });
-}
-
-    // =========================================
-    // 4. Lógica de Anexo e Envio AJAX (SALVAR)
-    // =========================================
-
-    // --- Lógica Visual (Preview e Remover) ---
-function processarArquivo(input, id) {
-    if (!input.files || !input.files.length) return;
-
-    const file = input.files[0];
-
-    const texto = document.getElementById('textoDisplay' + id);
-    const btnAnexo = document.getElementById('btnAnexo' + id);
-    const btnVisualizar = document.getElementById('btnVisualizar' + id);
-    const btnRemover = document.getElementById('btnRemover' + id);
-
-    const url = URL.createObjectURL(file);
-
-    // Atualiza texto
-    texto.innerHTML = `
-        <i class="bi bi-paperclip me-2"></i>
-        ${file.name}
-    `;
-
-    // 🔑 TROCA DE LAYOUT (ESSENCIAL)
-    btnAnexo.classList.remove('w-100');
-    btnAnexo.classList.add('flex-grow-1');
-
-    // Mostra botões
-    btnVisualizar.href = url;
-    btnVisualizar.classList.remove('d-none');
-    btnRemover.classList.remove('d-none');
-}
-
-
-
-    // --- Lógica de Envio AJAX  --- //
-    document.addEventListener("DOMContentLoaded", function() {
-    const forms = document.querySelectorAll('form[enctype="multipart/form-data"]');
-
-    forms.forEach(form => {
-        form.addEventListener('submit', async function(e) {
-            // Verifica se o form tem o input de anexo
-            if (!this.querySelector('input[name="anexo"]')) return;
-
-            e.preventDefault(); 
-
-            const btn = this.querySelector('button[type="submit"]');
-            const textoOriginal = btn.innerHTML;
-            const isDarkMode = document.body.classList.contains('dark-mode');
-
-            // Feedback visual no botão
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
-
-            try {
-                const formData = new FormData(this);
-                
-                const response = await fetch(this.action, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.ok) {
-                    // ✅ ALERTA IDENTICO AOS OUTROS (ESTILO TOAST)
-                    Swal.fire({
-                        toast: true,
-                        position: 'top-end',
-                        icon: 'success',
-                        title: 'Alterações salvas com sucesso',
-                        showConfirmButton: false,
-                        timer: 3000,
-                        timerProgressBar: true,
-                        background: isDarkMode ? '#152233' : '#fff',
-                        color: isDarkMode ? '#ffffff' : '#545454',
-                        customClass: {
-                            popup: isDarkMode ? 'swal2-dark-mode' : ''
-                        }
-                    }).then(() => {
-                        // Só recarrega após o tempo do Toast ou se o usuário fechar
-                        window.location.reload();
-                    });
-
-                } else {
-                    throw new Error('Erro no servidor');
-                }
-            } catch (error) {
-                console.error(error);
-                
-                // Erro também padronizado como Toast
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'error',
-                    title: 'Erro ao salvar. Tente novamente.',
-                    showConfirmButton: false,
-                    timer: 3000,
-                    timerProgressBar: true,
-                    background: isDarkMode ? '#152233' : '#fff',
-                    color: isDarkMode ? '#ffffff' : '#545454'
-                });
-
-                btn.disabled = false;
-                btn.innerHTML = textoOriginal;
-            }
-        });
-    });
-});
-
-    // =========================================
-    // 5. Lógica para esconder e mostrar justificativa (mostra só quando negado)
-    // =========================================
-
-    function toggleJustificativa(select, id) {
-    const box = document.getElementById('boxJustificativa' + id);
-    const input = document.getElementById('inputJustificativa' + id);
-
-    if (!box || !input) return;
-
-    const statusCriaJustificativa = (select.value === 'NEGADO');
-
-    if (statusCriaJustificativa) {
-        box.style.display = 'block';
-        input.setAttribute('required', 'required');
-        // Apenas foca se o usuário trocou manualmente, para não atrapalhar o scroll inicial
-        if (document.activeElement === select) input.focus(); 
-    } else {
-        box.style.display = 'none';
-        input.removeAttribute('required');
     }
-}
 
-    // ✅ Executa automaticamente ao carregar a página
-    document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('select[name="status"]').forEach(select => {
-            const form = select.closest('form');
-            if (!form) return;
+    // Função para resumir nomes de arquivos longos
+    function resumirNomeArquivo(nome, max = 22) {
+        if (!nome) return "";
+        if (nome.length <= max) return nome;
 
-            const id = form.action.split('/').pop();
-            toggleJustificativa(select, id);
+        const dot = nome.lastIndexOf(".");
+        const ext = dot > 0 ? nome.slice(dot) : "";
+        const base = dot > 0 ? nome.slice(0, dot) : nome;
+
+        const keepStart = Math.max(8, Math.floor((max - ext.length - 3) * 0.6));
+        const keepEnd = Math.max(5, (max - ext.length - 3) - keepStart);
+
+        return base.slice(0, keepStart) + "..." + base.slice(-keepEnd) + ext;
+    }
+
+    // Resumo de nome (sem depender de .btn-anexo > span)
+    document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll('[id^="textoDisplay"]').forEach(span => {
+            const original = (span.textContent || "").trim();
+            if (!original) return;
+
+            // tooltip com nome completo
+            span.setAttribute("title", original);
+
+            // tenta separar o nome do arquivo se tiver "📎" textual, senão usa tudo
+            const cleaned = original.replace(/^📎\s*/,'').trim();
+            const resumido = resumirNomeArquivo(cleaned, 22);
+
+            // preserva ícone <i> se existir
+            const icon = span.querySelector("i");
+            if (icon) {
+                const iconClone = icon.cloneNode(true);
+                span.innerHTML = "";
+                span.appendChild(iconClone);
+                span.insertAdjacentText("beforeend", " " + resumido);
+            } else {
+                span.textContent = resumido;
+            }
         });
     });
 
+    // --- TOGGLE JUSTIFICATIVA (só aparece em NEGADO) ---
+    function toggleJustificativa(select, id) {
+        const box = document.getElementById('boxJustificativa' + id);
+        const input = document.getElementById('inputJustificativa' + id);
+        if (!box || !input) return;
+
+        if (select.value === 'NEGADO') {
+            box.style.display = 'block';
+            input.setAttribute('required', 'required');
+        } else {
+            box.style.display = 'none';
+            input.removeAttribute('required');
+        }
+    }
+
+    // --- INICIALIZAÇÃO ---
+    document.addEventListener('DOMContentLoaded', () => {
+        // Inicializa justificativa em todos selects de status que tenham data-jid
+        document.querySelectorAll('select[name="status"][data-jid]').forEach(select => {
+            toggleJustificativa(select, select.dataset.jid);
+        });
+
+        // Chatbot logic (Mantido igual)
+        (function () {
+            if (window.ADMIN_CHAT_INIT) return;
+            window.ADMIN_CHAT_INIT = true;
+            const API_URL = "{{ url_for('main.admin_chatbot') }}";
+            const fab = document.getElementById("adminBotFab");
+            const chatWindow = document.getElementById("adminBotWindow");
+            const box = document.getElementById("adminBotMessages");
+            const input = document.getElementById("adminBotInput");
+            const send = document.getElementById("adminBotSend");
+            const closeBtns = document.querySelectorAll("#adminBotClose, #adminBotClear");
+
+            if(!fab) return;
+
+            function toggleChat() { chatWindow.classList.toggle('active'); if(chatWindow.classList.contains('active')) setTimeout(()=>input.focus(),300); }
+            fab.addEventListener("click", toggleChat);
+            closeBtns.forEach(b => b.addEventListener("click", (e) => {
+                if(e.currentTarget.id === 'adminBotClear') box.innerHTML = '';
+                else toggleChat();
+            }));
+
+            async function ask(txt) {
+                const msg = (txt || input.value || "").trim();
+                if(!msg) return;
+
+                const divMe = document.createElement("div"); divMe.className="message user"; divMe.innerText=msg; box.appendChild(divMe);
+                input.value="";
+
+                const divBot = document.createElement("div"); divBot.className="message bot"; divBot.innerHTML='...'; box.appendChild(divBot);
+                box.scrollTop = box.scrollHeight;
+
+                try {
+                    const r = await fetch(API_URL, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({message:msg})});
+                    const d = await r.json();
+                    divBot.innerHTML = d.answer || "Erro.";
+                } catch(e) { divBot.innerHTML = "Erro de conexão."; }
+            }
+            if(send) send.addEventListener("click", ()=>ask());
+            if(input) input.addEventListener("keydown", e=>{if(e.key==="Enter") ask()});
+            document.querySelectorAll(".chip").forEach(c => c.addEventListener("click", ()=>ask(c.getAttribute('data-q'))));
+        })();
+    });
 </script>
 {% endblock %}

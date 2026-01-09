@@ -41,7 +41,7 @@ from sqlalchemy.orm import joinedload
 # APP
 # ==========================
 from app import db
-from app.models import Notificacao, Solicitacao, Usuario, Clientes
+from app.models import Notificacao, Solicitacao, Usuario, Clientes, Pilotos
 
 print("--- ROTAS CARREGADAS COM SUCESSO ---")
 
@@ -122,25 +122,48 @@ def aplicar_filtros_base(query, filtro_data, uvis_id):
         query = query.filter(Solicitacao.usuario_id == int(uvis_id))
             
     return query
-# --- DASHBOARD UVIS ---
 
+from functools import wraps
+from flask import abort
+from flask_login import current_user
+
+def roles_required(*roles):
+    def deco(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            if not current_user.is_authenticated:
+                abort(401)
+            if current_user.tipo_usuario not in roles:
+                abort(403)
+            return fn(*args, **kwargs)
+        return wrapper
+    return deco
+
+# --- DASHBOARD UVIS ---
 @bp.route('/')
 @login_required
 def dashboard():
-    # 1. Redirecionamento de Perfis Administrativos (Prevenção de acesso indevido)
+
+    if current_user.tipo_usuario == 'piloto':
+        return redirect(url_for('main.piloto_os'))
+
     if current_user.tipo_usuario in ['admin', 'operario', 'visualizar']:
         return redirect(url_for('main.admin_dashboard'))
 
-    # 2. Query Otimizada
-    query = db.session.query(Solicitacao).options(joinedload(Solicitacao.usuario))\
+    # ✅ UVIS: só as solicitações dela + carrega piloto pra exibir
+    query = (
+        Solicitacao.query
+        .options(
+            joinedload(Solicitacao.usuario),
+            joinedload(Solicitacao.piloto)
+        )
         .filter(Solicitacao.usuario_id == current_user.id)
+    )
 
-    # 3. Aplicação de Filtros de Interface
     filtro_status = request.args.get('status')
     if filtro_status:
         query = query.filter(Solicitacao.status == filtro_status)
 
-    # 4. Paginação de Performance
     page = request.args.get("page", 1, type=int)
     paginacao = query.order_by(Solicitacao.data_criacao.desc())\
         .paginate(page=page, per_page=6, error_out=False)
@@ -148,7 +171,7 @@ def dashboard():
     return render_template(
         'dashboard.html',
         solicitacoes=paginacao.items,
-        paginacao=paginacao
+        paginacao=paginacao,
     )
 
 # --- PAINEL DE GESTÃO (Visualização para todos) ---
@@ -177,6 +200,18 @@ def admin_dashboard():
         .options(joinedload(Solicitacao.usuario)) \
         .join(Usuario)
 
+    query = (
+        Solicitacao.query
+        .options(
+            joinedload(Solicitacao.usuario),
+            joinedload(Solicitacao.piloto)  # bom pra exibir o nome do piloto já atribuído
+        )
+        .join(Usuario)
+    )
+
+    pilotos = Pilotos.query.order_by(Pilotos.nome_piloto.asc()).all()
+
+
     # --- Aplicação dos filtros ---
     if filtro_status:
         query = query.filter(Solicitacao.status == filtro_status)
@@ -203,9 +238,9 @@ def admin_dashboard():
         pedidos=paginacao.items,
         paginacao=paginacao,
         is_editable=is_editable,
-        now=datetime.now()
+        now=datetime.now(),
+        pilotos=pilotos,
     )
-
 
 @bp.route('/admin/exportar_excel')
 @login_required
@@ -349,12 +384,19 @@ def exportar_excel():
         )
         return redirect(url_for('main.admin_dashboard'))
 
+from flask import request, jsonify, current_app, redirect, url_for, flash
+import os, uuid
+from werkzeug.utils import secure_filename
+
 @bp.route('/admin/atualizar/<int:id>', methods=['POST'])
 @login_required
 def atualizar(id):
 
     # 🔐 Permissão
     if current_user.tipo_usuario not in ['admin', 'operario']:
+        if request.accept_mimetypes.accept_html and not request.is_json:
+            flash("Permissão negada.", "danger")
+            return redirect(request.referrer or url_for("main.admin_dashboard"))
         return jsonify({"error": "Permissão negada"}), 403
 
     pedido = Solicitacao.query.get_or_404(id)
@@ -366,48 +408,92 @@ def atualizar(id):
     pedido.latitude = request.form.get('latitude')
     pedido.longitude = request.form.get('longitude')
 
+    # ✅ Atribuição de piloto (opcional)
+    piloto_id = request.form.get("piloto_id")
+
+    if piloto_id in (None, "", "null", "undefined"):
+        pedido.piloto_id = None
+    else:
+        try:
+            piloto_id_int = int(piloto_id)
+            existe = Pilotos.query.get(piloto_id_int)
+            if not existe:
+                flash("Piloto selecionado não existe.", "warning")
+                return redirect(request.referrer or url_for("main.admin_dashboard"))
+            pedido.piloto_id = piloto_id_int
+        except ValueError:
+            flash("Piloto inválido.", "warning")
+            return redirect(request.referrer or url_for("main.admin_dashboard"))
+
+    # ✅ Regra de negócio: se aprovou, precisa ter piloto
+    status_aprovacao = ["APROVADO", "APROVADO COM RECOMENDAÇÕES"]
+    if pedido.status in status_aprovacao and not pedido.piloto_id:
+        flash("Para aprovar, selecione um piloto responsável.", "warning")
+        return redirect(request.referrer or url_for("main.admin_dashboard"))
+
     # Processamento de Anexo
     file = request.files.get("anexo")
     if file and file.filename:
         if allowed_file(file.filename):
-            from werkzeug.utils import secure_filename # Garantir import
-            
-            # Recupera a extensão original corretamente
             original_filename = secure_filename(file.filename)
             ext = original_filename.rsplit(".", 1)[1].lower()
-            # Nome único mantendo a extensão real do arquivo
             unique_name = f"sol_{pedido.id}_{uuid.uuid4().hex}.{ext}"
             upload_folder = get_upload_folder()
             file_path = os.path.join(upload_folder, unique_name)
-            
-            pedido.anexo_path = f"upload-files/{unique_name}"
-            pedido.anexo_nome = original_filename
 
             try:
                 file.save(file_path)
-                # Atualiza o banco APENAS se o arquivo foi salvo com sucesso
                 pedido.anexo_path = f"upload-files/{unique_name}"
                 pedido.anexo_nome = original_filename
             except Exception as e:
                 current_app.logger.error(f"Erro ao salvar arquivo físico: {e}")
+                if request.accept_mimetypes.accept_html and not request.is_json:
+                    flash("Falha ao salvar o arquivo no servidor.", "danger")
+                    return redirect(request.referrer or url_for("main.admin_dashboard"))
                 return jsonify({"error": "Falha ao salvar o arquivo no servidor."}), 500
         else:
-                return jsonify({"error": "Formato de arquivo não permitido."}), 400
-        
-    # commit final
+            if request.accept_mimetypes.accept_html and not request.is_json:
+                flash("Formato de arquivo não permitido.", "warning")
+                return redirect(request.referrer or url_for("main.admin_dashboard"))
+            return jsonify({"error": "Formato de arquivo não permitido."}), 400
+
+    # commit final (MANTER APENAS ESTE BLOCO)
     try:
         db.session.commit()
-        return jsonify({
-            "ok": True, 
-            "message": "Solicitação atualizada com sucesso!",
-            "anexo_nome": pedido.anexo_nome # Retorna para o JS atualizar a interface
-        }), 200
+
+        is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.is_json
+        if is_ajax:
+            return jsonify({
+                "ok": True,
+                "message": "Solicitação atualizada com sucesso!",
+                "anexo_nome": pedido.anexo_nome,
+                "piloto_id": pedido.piloto_id,
+            }), 200
+
+        flash("Solicitação atualizada com sucesso!", "success")
+        return redirect(request.referrer or url_for("main.admin_dashboard"))
+
     except Exception as e:
         db.session.rollback()
-        # Se falhou o banco, o ideal seria remover o arquivo físico salvo (cleanup), 
-        # mas em muitos casos de produção (Render) o disco é efêmero, então não é crítico.
         current_app.logger.error(f"Erro de Banco (Atualizar ID {id}): {e}")
+
+        if request.accept_mimetypes.accept_html and not request.is_json:
+            flash("Erro ao gravar dados no banco de dados.", "danger")
+            return redirect(request.referrer or url_for("main.admin_dashboard"))
+
         return jsonify({"error": "Erro ao gravar dados no banco de dados."}), 500
+
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Erro de Banco (Atualizar ID {id}): {e}")
+
+        if request.accept_mimetypes.accept_html and not request.is_json:
+            flash("Erro ao gravar dados no banco de dados.", "danger")
+            return redirect(request.referrer or url_for("main.admin_dashboard"))
+
+        return jsonify({"error": "Erro ao gravar dados no banco de dados."}), 500
+
     
 # --- NOVO PEDIDO ---
 from flask_login import login_required, current_user
@@ -869,9 +955,9 @@ def exportar_relatorio_pdf():
     ]
 
     if db.engine.name == 'postgresql':
-        func_mes = db.func.to_char(Solicitacao.data_criacao, 'YYYY-MM')
+        func_mes = db.func.to_char(Solicitacao.data_agendamento, 'YYYY-MM')
     else:
-        func_mes = db.func.strftime('%Y-%m', Solicitacao.data_criacao)
+        func_mes = db.func.strftime('%Y-%m', Solicitacao.data_agendamento)
 
     dados_mensais = [
         tuple(row) for row in (
@@ -1140,8 +1226,8 @@ def exportar_relatorio_pdf():
     else:
         story.append(Paragraph("Matplotlib não disponível — gráficos foram omitidos.", normal))
 
-    # -------------------------
-    # DETALHES (opcional: se quiser manter, deixa por último)
+        # -------------------------
+    # DETALHES (Registros Detalhados)
     # -------------------------
     story.append(PageBreak())
     story.append(Paragraph("Registros Detalhados", section_h))
@@ -1152,8 +1238,25 @@ def exportar_relatorio_pdf():
         'Data', 'Hora', 'Unidade', 'Região', 'Protocolo',
         'Status', 'Foco', 'Tipo Visita', 'Altura Voo', 'Observação'
     ]
-    registros_rows = [[Paragraph(h, ParagraphStyle('hdr', parent=cell_style, textColor=colors.white, fontSize=8.7))
-                       for h in registros_header]]
+
+    hdr_style = ParagraphStyle(
+        'hdr',
+        parent=cell_style,
+        textColor=colors.white,
+        fontSize=7.8,
+        leading=9.2
+    )
+
+    cell_style_small = ParagraphStyle(
+        'cell_small',
+        parent=cell_style,
+        fontSize=7.6,
+        leading=9.2,
+        wordWrap='CJK',
+        splitLongWords=True
+    )
+
+    registros_rows = [[Paragraph(h, hdr_style) for h in registros_header]]
 
     for s, u in query_results:
         data_str = s.data_criacao.strftime("%d/%m/%Y") if getattr(s, 'data_criacao', None) else ''
@@ -1171,41 +1274,75 @@ def exportar_relatorio_pdf():
         obs = getattr(s, 'observacao', '') or ''
 
         registros_rows.append([
-            Paragraph(str(data_str), cell_style),
-            Paragraph(str(hora_str), cell_style),
-            Paragraph(str(unidade), cell_style),
-            Paragraph(str(regiao), cell_style),
-            Paragraph(str(protocolo), cell_style),
-            Paragraph(str(status), cell_style),
-            Paragraph(str(foco), cell_style),
-            Paragraph(str(tipo_visita), cell_style),
-            Paragraph(str(altura_voo), cell_style),
-            Paragraph(str(obs), cell_style),
+            Paragraph(str(data_str), cell_style_small),
+            Paragraph(str(hora_str), cell_style_small),
+            Paragraph(str(unidade), cell_style_small),
+            Paragraph(str(regiao), cell_style_small),
+            Paragraph(str(protocolo), cell_style_small),
+            Paragraph(str(status), cell_style_small),
+            Paragraph(str(foco), cell_style_small),
+            Paragraph(str(tipo_visita), cell_style_small),
+            Paragraph(str(altura_voo), cell_style_small),
+            Paragraph(str(obs), cell_style_small),
         ])
 
-    chunk_size = 26
-    colWidths = [18*mm, 14*mm, 28*mm, 22*mm, 22*mm, 22*mm, 22*mm, 26*mm, 18*mm, 60*mm]
+    # ✅ Larguras base (as suas), mas vamos “encaixar” no doc.width automaticamente
+    base_col_widths = [
+        18*mm, 14*mm, 28*mm, 22*mm, 22*mm,
+        22*mm, 22*mm, 26*mm, 18*mm, 60*mm
+    ]
 
+    # ✅ Se a soma estourar a largura útil da página, escala proporcionalmente
+    total_w = sum(base_col_widths)
+    max_w = doc.width  # largura útil = página - margens
+
+    if total_w > max_w:
+        scale = max_w / total_w
+        colWidths = [w * scale for w in base_col_widths]
+    else:
+        colWidths = base_col_widths
+
+    # ✅ Quantidade de linhas por página (ajuste fino)
+    chunk_size = 28 if orient == 'landscape' else 24
+
+    # 🔥 renderiza em blocos para não ficar pesado e manter header repetido
     for i in range(0, len(registros_rows), chunk_size):
-        chunk = registros_rows[i:i+chunk_size]
-        tbl = Table(chunk, repeatRows=1, colWidths=colWidths)
+        chunk = registros_rows[i:i + chunk_size]
+
+        tbl = Table(
+            chunk,
+            repeatRows=1,
+            colWidths=colWidths,
+            hAlign='LEFT'  # ✅ evita “puxar” pro centro e cortar laterais
+        )
+
         tbl.setStyle(TableStyle([
-            ('BACKGROUND', (0,0),(-1,0),colors.HexColor('#0d6efd')),
-            ('TEXTCOLOR',(0,0),(-1,0),colors.white),
-            ('FONTNAME',(0,0),(-1,0),'Helvetica-Bold'),
-            ('FONTSIZE',(0,0),(-1,0),8.4),
-            ('GRID',(0,0),(-1,-1),0.25,colors.HexColor('#d9dee7')),
-            ('ROWBACKGROUNDS',(0,1),(-1,-1),[colors.white,colors.HexColor('#fbfdff')]),
-            ('VALIGN',(0,0),(-1,-1),'TOP'),
-            ('LEFTPADDING',(0,0),(-1,-1),4),
-            ('RIGHTPADDING',(0,0),(-1,-1),4),
-            ('TOPPADDING',(0,0),(-1,-1),3),
-            ('BOTTOMPADDING',(0,0),(-1,-1),3),
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#0d6efd')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+
+            ('GRID', (0,0), (-1,-1), 0.25, colors.HexColor('#d9dee7')),
+            ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#fbfdff')]),
+
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('ALIGN', (0,0), (-1,0), 'LEFT'),
+            ('ALIGN', (0,1), (-1,-1), 'LEFT'),
+
+            ('LEFTPADDING', (0,0), (-1,-1), 3),
+            ('RIGHTPADDING', (0,0), (-1,-1), 3),
+            ('TOPPADDING', (0,0), (-1,-1), 2),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+
+            # ✅ reforço de quebra de linha dentro das células
+            ('WORDWRAP', (0,0), (-1,-1), 'CJK'),
         ]))
+
         story.append(tbl)
         story.append(Spacer(1, 6))
+
         if i + chunk_size < len(registros_rows):
             story.append(PageBreak())
+
 
     # -------------------------
     # Header/Footer
@@ -2203,22 +2340,20 @@ def baixar_anexo(id):
         download_name=(pedido.anexo_nome or rel)
     )
 
-@bp.route("/admin/solicitacao/<int:id>/remover-anexo", methods=["POST"])
+@bp.route("/admin/solicitacao/<int:id>/remover_anexo", methods=["POST"])
 @login_required
 def remover_anexo(id):
     pedido = Solicitacao.query.get_or_404(id)
 
-    if current_user.tipo_usuario not in ["admin", "operario"]:
-        abort(403)
+    # ... lógica de permissão ...
 
     pedido.anexo_path = None
     pedido.anexo_nome = None
     db.session.commit()
-    
 
-    return jsonify({"ok": True})
-
-
+    # ✅ Isso fará o Toast "Removido com sucesso" aparecer no topo igual aos outros deletes
+    flash('PDF removido com sucesso!', 'success') 
+    return redirect(url_for('main.dashboard'))
 
 @bp.route("/admin/uvis/novo", methods=["GET", "POST"], endpoint="admin_uvis_novo")
 @login_required
@@ -2301,6 +2436,12 @@ def admin_uvis_listar():
         page=page, per_page=10, error_out=False
     )
 
+    query = db.session.query(Solicitacao).options(
+        joinedload(Solicitacao.usuario),
+        joinedload(Solicitacao.piloto)  # ✅
+    ).filter(Solicitacao.usuario_id == current_user.id)
+
+
     filters = {
         "q": q,
         "regiao": regiao,
@@ -2312,7 +2453,10 @@ def admin_uvis_listar():
         "admin_uvis_listar.html",
         uvis=paginacao.items,
         paginacao=paginacao,
-        filters=filters
+        filters=filters,
+        q=q,
+        regiao=regiao,
+        codigo_setor=codigo_setor
     )
 
 @bp.route("/admin/uvis/<int:id>/editar", methods=["GET", "POST"], endpoint="admin_uvis_editar")
@@ -3514,6 +3658,591 @@ def admin_uvis_exportar():
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
+
 @bp.route('/sw.js')
 def serve_sw():
     return bp.send_static_file('sw.js')
+# se você já tem essa função no projeto, reaproveite
+def only_digits(v: str) -> str:
+    return re.sub(r"\D+", "", v or "")
+
+import re
+import math
+from datetime import datetime
+from io import BytesIO
+
+from flask import request, render_template, flash, redirect, url_for, abort, send_file
+from flask_login import login_required, current_user
+from werkzeug.security import generate_password_hash
+
+from app import db
+from app.models import Pilotos, Usuario  # ajuste o import conforme sua estrutura
+
+
+def only_digits(v: str) -> str:
+    return re.sub(r"\D+", "", v or "")
+
+
+def format_phone_br(digits: str) -> str:
+    d = only_digits(digits)
+    if len(d) == 10:
+        return f"({d[:2]}) {d[2:6]}-{d[6:]}"
+    if len(d) == 11:
+        return f"({d[:2]}) {d[2:7]}-{d[7:]}"
+    return digits or ""
+
+
+REGIOES = {"NORTE", "SUL", "LESTE", "OESTE"}
+
+
+# -------------------------------------------------------------
+# CADASTRAR PILOTO + CRIAR USUÁRIO (tipo_usuario="piloto")
+# -------------------------------------------------------------
+@bp.route('/pilotos/cadastrar', methods=['GET', 'POST'], endpoint='cadastrar_pilotos')
+@login_required
+def cadastrar_pilotos():
+    if getattr(current_user, "tipo_usuario", None) != "admin":
+        abort(403)
+
+    errors = {}
+    form = {}
+
+    if request.method == "POST":
+        # dados do piloto
+        nome_piloto = (request.form.get("nome_piloto") or "").strip()
+        regiao = (request.form.get("regiao") or "").strip().upper()
+        telefone = (request.form.get("telefone") or "").strip()
+        tel_digits = only_digits(telefone)
+
+        # credenciais do usuário piloto
+        login = (request.form.get("login") or "").strip()
+        senha = (request.form.get("senha") or "")
+        senha2 = (request.form.get("senha2") or "")
+
+        form = {
+            "nome_piloto": nome_piloto,
+            "regiao": regiao,
+            "telefone": telefone,
+            "login": login,
+            "senha": senha,
+            "senha2": senha2,
+        }
+
+        # validações
+        if not nome_piloto:
+            errors["nome_piloto"] = "Informe o nome do piloto."
+
+        if regiao and regiao not in REGIOES:
+            errors["regiao"] = "Selecione uma região válida."
+
+        if telefone and len(tel_digits) not in (10, 11):
+            errors["telefone"] = "Telefone deve ter 10 ou 11 dígitos (com DDD)."
+
+        # duplicidade de piloto (nome + telefone se tiver)
+        if nome_piloto:
+            q = Pilotos.query.filter(db.func.lower(Pilotos.nome_piloto) == nome_piloto.lower())
+            if tel_digits:
+                q = q.filter(Pilotos.telefone == tel_digits)
+            if q.first():
+                errors["nome_piloto"] = "Já existe um piloto com esse nome (e telefone)."
+
+        # login
+        if not login:
+            errors["login"] = "Informe um login para o piloto."
+        else:
+            existe_login = Usuario.query.filter(db.func.lower(Usuario.login) == login.lower()).first()
+            if existe_login:
+                errors["login"] = "Esse login já está em uso."
+
+        # senha
+        if not senha:
+            errors["senha"] = "Informe uma senha."
+        elif len(senha) < 6:
+            errors["senha"] = "A senha deve ter pelo menos 6 caracteres."
+
+        if senha != senha2:
+            errors["senha2"] = "As senhas não conferem."
+
+        if errors:
+            flash("Corrija os campos destacados.", "warning")
+            return render_template("cadastrar_pilotos.html", form=form, errors=errors)
+
+        try:
+            # 1) cria piloto
+            novo_piloto = Pilotos(
+                nome_piloto=nome_piloto,
+                regiao=regiao or None,
+                telefone=tel_digits or None,
+            )
+            db.session.add(novo_piloto)
+            db.session.flush()  # garante novo_piloto.id
+
+            # 2) cria usuário do piloto (nome_uvis é obrigatório no seu model)
+            user_piloto = Usuario(
+                nome_uvis=nome_piloto,          # ✅ obrigatório
+                regiao=regiao or None,          # opcional, mas útil
+                codigo_setor=None,
+                login=login,
+                tipo_usuario="piloto",
+                piloto_id=novo_piloto.id,
+            )
+            user_piloto.set_senha(senha)
+
+            db.session.add(user_piloto)
+            db.session.commit()
+
+            flash("Piloto e usuário criados com sucesso!", "success")
+            return redirect(url_for("main.listar_pilotos"))
+
+        except Exception:
+            db.session.rollback()
+            flash("Erro ao cadastrar piloto/usuário. Tente novamente.", "danger")
+            return render_template("cadastrar_pilotos.html", form=form, errors=errors)
+
+    return render_template("cadastrar_pilotos.html", form=form, errors=errors)
+
+
+# -------------------------------------------------------------
+# LISTAR PILOTOS (admin e uvis)
+# -------------------------------------------------------------
+@bp.route("/pilotos", methods=["GET"], endpoint="listar_pilotos")
+@login_required
+def listar_pilotos():
+    user_tipo = getattr(current_user, "tipo_usuario", None)
+
+    if user_tipo not in ("admin", "uvis"):
+        abort(403)
+
+    q = (request.args.get("q") or "").strip()
+    regiao = (request.args.get("regiao") or "").strip().upper()
+    telefone = (request.args.get("telefone") or "").strip()
+    sort = (request.args.get("sort") or "nome_asc").strip()
+
+    try:
+        page = int(request.args.get("page") or 1)
+    except ValueError:
+        page = 1
+    page = max(1, page)
+
+    try:
+        per_page = int(request.args.get("per_page") or 20)
+    except ValueError:
+        per_page = 20
+    per_page = 10 if per_page < 10 else 50 if per_page > 50 else per_page
+
+    export = (request.args.get("export") or "").strip().lower()
+
+    # ✅ Controle de região para UVIS (força a regiao da uvis)
+    uvis_regiao = (getattr(current_user, "regiao", None) or "").strip().upper()
+    if user_tipo == "uvis":
+        if not uvis_regiao:
+            flash("Sua UVIS está sem região cadastrada. Contate o administrador.", "warning")
+            return render_template(
+                "listar_pilotos.html",
+                pilotos=[],
+                filters={"q": q, "regiao": "", "telefone": telefone, "sort": sort, "page": 1, "per_page": per_page, "total": 0, "total_pages": 1},
+                is_admin=False,
+                uvis_regiao=None
+            )
+        regiao = uvis_regiao
+
+    query = Pilotos.query
+
+    if regiao:
+        query = query.filter(Pilotos.regiao == regiao)
+
+    if telefone:
+        query = query.filter(Pilotos.telefone.ilike(f"%{only_digits(telefone)}%"))
+
+    if q:
+        like = f"%{q}%"
+        q_digits = only_digits(q)
+        query = query.filter(
+            db.or_(
+                Pilotos.nome_piloto.ilike(like),
+                Pilotos.regiao.ilike(like),
+                Pilotos.telefone.ilike(f"%{q_digits}%") if q_digits else db.false(),
+            )
+        )
+
+    if sort == "nome_desc":
+        query = query.order_by(Pilotos.nome_piloto.desc())
+    elif sort == "id_desc":
+        query = query.order_by(Pilotos.id.desc())
+    elif sort == "id_asc":
+        query = query.order_by(Pilotos.id.asc())
+    else:
+        query = query.order_by(Pilotos.nome_piloto.asc())
+
+    # -----------------------------
+    # Exportação Excel
+    # -----------------------------
+    if export == "xlsx":
+        rows = query.all()
+
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Pilotos"
+
+        header_fill = PatternFill("solid", fgColor="1F2937")
+        header_font = Font(bold=True, color="FFFFFF")
+        header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+        thin = Side(style="thin", color="E5E7EB")
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+        text_align = Alignment(horizontal="left", vertical="center", wrap_text=True)
+        center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+        ws["A1"] = "Relatório de Pilotos"
+        ws["A1"].font = Font(bold=True, size=14)
+        ws["A2"] = f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        ws["A2"].font = Font(color="6B7280")
+
+        if user_tipo == "uvis":
+            ws["A3"] = f"Região (UVIS): {uvis_regiao}"
+            ws["A3"].font = Font(color="6B7280")
+
+        start_row = 5 if user_tipo == "uvis" else 4
+        headers = ["ID", "Nome", "Região", "Telefone"]
+
+        for col_idx, h in enumerate(headers, start=1):
+            cell = ws.cell(row=start_row, column=col_idx, value=h)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = header_align
+            cell.border = border
+
+        for i, p in enumerate(rows, start=start_row + 1):
+            values = [p.id, p.nome_piloto, p.regiao or "", format_phone_br(p.telefone or "") or ""]
+            for col_idx, v in enumerate(values, start=1):
+                cell = ws.cell(row=i, column=col_idx, value=v)
+                cell.border = border
+                cell.alignment = center_align if col_idx == 1 else text_align
+                if col_idx == 4:
+                    cell.number_format = "@"
+
+        last_row = start_row + len(rows)
+        last_col = len(headers)
+
+        ws.freeze_panes = ws[f"A{start_row+1}"]
+        ws.auto_filter.ref = f"A{start_row}:{get_column_letter(last_col)}{max(last_row, start_row)}"
+
+        max_widths = {1: 8, 2: 30, 3: 14, 4: 20}
+        for col_idx in range(1, last_col + 1):
+            max_len = len(headers[col_idx - 1])
+            for r in range(start_row + 1, last_row + 1):
+                val = ws.cell(row=r, column=col_idx).value
+                if val is None:
+                    continue
+                max_len = max(max_len, len(str(val)))
+            ws.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 2, max_widths.get(col_idx, 35))
+
+        zebra_fill = PatternFill("solid", fgColor="F9FAFB")
+        for r in range(start_row + 1, last_row + 1):
+            if (r - (start_row + 1)) % 2 == 1:
+                for ccol in range(1, last_col + 1):
+                    ws.cell(row=r, column=ccol).fill = zebra_fill
+
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
+        filename = f"pilotos_{stamp}.xlsx"
+
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name=filename,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    # -----------------------------
+    # Paginação
+    # -----------------------------
+    total = query.count()
+    total_pages = max(1, math.ceil(total / per_page))
+    if page > total_pages:
+        page = total_pages
+
+    pilotos_db = query.offset((page - 1) * per_page).limit(per_page).all()
+
+    pilotos = [
+        {
+            "id": p.id,
+            "nome_piloto": p.nome_piloto,
+            "regiao": p.regiao or "-",
+            "telefone_fmt": format_phone_br(p.telefone or "") or "-",
+            "telefone_digits": only_digits(p.telefone or ""),
+        }
+        for p in pilotos_db
+    ]
+
+    filters = {
+        "q": q,
+        "regiao": regiao,
+        "telefone": telefone,
+        "sort": sort,
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "total_pages": total_pages,
+    }
+
+    return render_template(
+        "listar_pilotos.html",
+        pilotos=pilotos,
+        filters=filters,
+        is_admin=(user_tipo == "admin"),
+        uvis_regiao=(uvis_regiao if user_tipo == "uvis" else None),
+    )
+
+
+# -------------------------------------------------------------
+# EDITAR PILOTO (admin) + atualizar usuário do piloto (login/senha)
+# -------------------------------------------------------------
+@bp.route("/pilotos/<int:piloto_id>/editar", methods=["GET", "POST"], endpoint="editar_piloto")
+@login_required
+def editar_piloto(piloto_id):
+    # Segurança: só admin
+    if getattr(current_user, "tipo_usuario", None) != "admin":
+        abort(403)
+
+    piloto = Pilotos.query.get_or_404(piloto_id)
+
+    # usuário de login do piloto (se existir)
+    usuario_piloto = Usuario.query.filter_by(piloto_id=piloto.id, tipo_usuario="piloto").first()
+
+    errors = {}
+    form = {}
+
+    if request.method == "POST":
+        # -----------------------------
+        # Campos do piloto
+        # -----------------------------
+        nome_piloto = (request.form.get("nome_piloto") or "").strip()
+        regiao = (request.form.get("regiao") or "").strip().upper()
+        telefone = (request.form.get("telefone") or "").strip()
+        tel_digits = only_digits(telefone)
+
+        # -----------------------------
+        # Campos de acesso (login)
+        # -----------------------------
+        login = (request.form.get("login") or "").strip()
+        senha = (request.form.get("senha") or "").strip()
+        senha2 = (request.form.get("senha2") or "").strip()
+
+        # Mantém valores para re-render
+        form = {
+            "nome_piloto": nome_piloto,
+            "regiao": regiao,
+            "telefone": telefone,
+            "login": login,
+            # nunca re-render senha por segurança
+        }
+
+        # -----------------------------
+        # Validações piloto
+        # -----------------------------
+        if not nome_piloto:
+            errors["nome_piloto"] = "Informe o nome do piloto."
+
+        if regiao and regiao not in REGIOES:
+            errors["regiao"] = "Selecione uma região válida."
+
+        if telefone and len(tel_digits) not in (10, 11):
+            errors["telefone"] = "Telefone deve ter 10 ou 11 dígitos (com DDD)."
+
+        # duplicidade ignorando o próprio
+        if nome_piloto:
+            q = Pilotos.query.filter(db.func.lower(Pilotos.nome_piloto) == nome_piloto.lower())
+            if tel_digits:
+                q = q.filter(Pilotos.telefone == tel_digits)
+            q = q.filter(Pilotos.id != piloto.id)
+            if q.first():
+                errors["nome_piloto"] = "Já existe um piloto com esse nome (e telefone)."
+
+        # -----------------------------
+        # Validações acesso
+        # -----------------------------
+        if not login:
+            errors["login"] = "Informe o login do piloto."
+
+        # login único (tirando o próprio usuario_piloto)
+        if login:
+            q_login = Usuario.query.filter(db.func.lower(Usuario.login) == login.lower())
+            if usuario_piloto:
+                q_login = q_login.filter(Usuario.id != usuario_piloto.id)
+            if q_login.first():
+                errors["login"] = "Este login já está em uso. Escolha outro."
+
+        # senha: opcional no editar
+        if senha or senha2:
+            if len(senha) < 4:
+                errors["senha"] = "A senha deve ter pelo menos 4 caracteres."
+            if senha != senha2:
+                errors["senha2"] = "As senhas não conferem."
+
+        if errors:
+            flash("Corrija os campos destacados.", "warning")
+            return render_template(
+                "editar_piloto.html",
+                piloto=piloto,
+                form=form,
+                errors=errors,
+                usuario_piloto=usuario_piloto
+            )
+
+        # -----------------------------
+        # Salva piloto
+        # -----------------------------
+        piloto.nome_piloto = nome_piloto
+        piloto.regiao = regiao or None
+        piloto.telefone = tel_digits or None
+
+        # -----------------------------
+        # Salva/Cria usuário do piloto
+        # -----------------------------
+        if not usuario_piloto:
+            # se por algum motivo não existir, cria agora
+            usuario_piloto = Usuario(
+                nome_uvis=nome_piloto,
+                regiao=regiao or None,
+                codigo_setor=None,
+                login=login,
+                tipo_usuario="piloto",
+                piloto_id=piloto.id
+            )
+            # se admin não informou senha ao "editar", força criar uma
+            if not senha:
+                errors["senha"] = "Defina uma senha para criar o acesso do piloto."
+                flash("Corrija os campos destacados.", "warning")
+                return render_template(
+                    "editar_piloto.html",
+                    piloto=piloto,
+                    form=form,
+                    errors=errors,
+                    usuario_piloto=usuario_piloto
+                )
+            usuario_piloto.set_senha(senha)
+            db.session.add(usuario_piloto)
+        else:
+            # atualiza dados básicos do usuario
+            usuario_piloto.nome_uvis = nome_piloto
+            usuario_piloto.regiao = regiao or None
+            usuario_piloto.login = login
+
+            # troca senha somente se veio preenchida
+            if senha:
+                usuario_piloto.set_senha(senha)
+
+        db.session.commit()
+
+        flash("Piloto atualizado com sucesso!", "success")
+        return redirect(url_for("main.listar_pilotos"))
+
+    # -----------------------------
+    # GET: valores default
+    # -----------------------------
+    form = {
+        "nome_piloto": piloto.nome_piloto,
+        "regiao": (piloto.regiao or ""),
+        "telefone": format_phone_br(piloto.telefone or ""),
+        "login": (usuario_piloto.login if usuario_piloto else ""),
+    }
+
+    return render_template(
+        "editar_piloto.html",
+        piloto=piloto,
+        form=form,
+        errors=errors,
+        usuario_piloto=usuario_piloto
+    )
+
+
+# -------------------------------------------------------------
+# DELETAR PILOTO (admin) + deletar usuário do piloto (se existir)
+# -------------------------------------------------------------
+@bp.route("/pilotos/<int:piloto_id>/deletar", methods=["POST"], endpoint="deletar_piloto")
+@login_required
+def deletar_piloto(piloto_id):
+    if getattr(current_user, "tipo_usuario", None) != "admin":
+        abort(403)
+
+    piloto = Pilotos.query.get_or_404(piloto_id)
+
+    # apaga usuário(s) vinculados a esse piloto
+    Usuario.query.filter_by(piloto_id=piloto.id, tipo_usuario="piloto").delete(synchronize_session=False)
+
+    db.session.delete(piloto)
+    db.session.commit()
+
+    flash("Piloto excluído com sucesso.", "success")
+    return redirect(url_for("main.listar_pilotos"))
+
+
+@bp.route('/piloto/os')
+@login_required
+@roles_required('piloto')
+def piloto_os():
+    if not current_user.piloto_id:
+        flash("Piloto sem vínculo cadastrado.", "danger")
+        return redirect(url_for('main.dashboard'))
+
+    status_ok = ["APROVADA", "APROVADA COM RECOMENDAÇÕES", "APROVADO", "APROVADO COM RECOMENDAÇÕES"]
+
+    query = (
+        Solicitacao.query
+        .options(joinedload(Solicitacao.usuario))
+        .filter(
+            Solicitacao.piloto_id == current_user.piloto_id,
+            Solicitacao.status.in_(status_ok)
+        )
+    )
+
+    filtro_data = request.args.get("data")  # ex: 2026-01
+    uvis_id = request.args.get("uvis_id")
+    query = aplicar_filtros_base(query, filtro_data, uvis_id)
+
+    page = request.args.get("page", 1, type=int)
+    paginacao = query.order_by(
+        Solicitacao.data_agendamento.asc(),
+        Solicitacao.hora_agendamento.asc()
+    ).paginate(page=page, per_page=6, error_out=False)
+
+    return render_template(
+        "piloto_os.html",
+        pedidos=paginacao.items,
+        paginacao=paginacao,
+        status_ok=status_ok
+    )
+
+
+@bp.route('/piloto/os/<int:os_id>/concluir', methods=['POST'])
+@login_required
+@roles_required('piloto')
+def piloto_concluir_os(os_id):
+
+    s = Solicitacao.query.get_or_404(os_id)
+
+    if s.piloto_id != current_user.piloto_id:
+        flash("Você não pode alterar esta OS.", "danger")
+        return redirect(url_for('main.piloto_os'))
+
+    status_ok = ["APROVADO", "APROVADO COM RECOMENDAÇÕES", "APROVADA", "APROVADA COM RECOMENDAÇÕES"]
+    if s.status not in status_ok:
+        flash("A OS não está aprovada.", "warning")
+        return redirect(url_for('main.piloto_os'))
+
+    s.status = "CONCLUÍDO"
+    db.session.commit()
+
+    flash("Ordem de serviço concluída com sucesso.", "success")
+    return redirect(url_for('main.piloto_os'))
+
+

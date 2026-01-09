@@ -1,4 +1,126 @@
 {% extends "base.html" %}
+
+{% block extra_styles %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components/tables.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components/forms.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components/buttons.css') }}">
+
+  <style>
+    /* =========================
+       RELATÓRIOS - HEADER (título + botões)
+       ========================= */
+
+    .rel-header{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap: 14px;
+    }
+
+    .rel-title h2{
+      color: var(--bs-body-color);
+    }
+
+    .rel-actions{
+      display:flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* botão export mais “premium” */
+    .rel-btn{
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      border-radius: 999px;
+      padding: .65rem 1rem;
+      font-weight: 700;
+      box-shadow: 0 8px 18px rgba(0,0,0,.08);
+      border: 1px solid rgba(0,0,0,.08);
+      white-space: nowrap;
+    }
+
+    /* ícone em bolinha (fica lindo no mobile) */
+    .rel-btn i{
+      width: 34px;
+      height: 34px;
+      display:grid;
+      place-items:center;
+      border-radius: 999px;
+      background: rgba(255,255,255,.18);
+    }
+
+    /* Desktop: deixa alinhado e equilibrado */
+    @media (min-width: 992px){
+      .rel-btn{
+        min-width: 190px;
+        justify-content: center;
+      }
+    }
+
+    /* ✅ Mobile: título em cima e botões em grade */
+    @media (max-width: 768px){
+      .rel-header{
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .rel-actions{
+        display:grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .rel-actions form{
+        width: 100%;
+      }
+
+      .rel-btn{
+        width: 100%;
+        justify-content: center;
+        padding: .9rem .8rem;
+        border-radius: 18px;
+        flex-direction: column;
+        gap: 8px;
+        text-align:center;
+      }
+
+      .rel-btn i{
+        width: 44px;
+        height: 44px;
+        font-size: 1.1rem;
+      }
+
+      .rel-btn span{
+        font-size: .92rem;
+        line-height: 1.1;
+      }
+    }
+
+    /* =========================
+       DARK MODE (header)
+       ========================= */
+    html.dark-mode .rel-btn,
+    body.dark-mode .rel-btn{
+      border-color: #233549 !important;
+      box-shadow: 0 14px 28px rgba(0,0,0,.35) !important;
+    }
+
+    /* PDF (btn-danger) no dark */
+    html.dark-mode .btn.btn-danger.rel-btn,
+    body.dark-mode .btn.btn-danger.rel-btn{
+      filter: saturate(1.05);
+    }
+
+    /* Excel (btn-success) no dark */
+    html.dark-mode .btn.btn-success.rel-btn,
+    body.dark-mode .btn.btn-success.rel-btn{
+      filter: saturate(1.05);
+    }
+  </style>
+{% endblock %}
+
+
 {% block content %}
 
 {% set meses = {
@@ -17,82 +139,125 @@
 <div class="container-fluid py-4" style="max-width: 1200px;">
 
     {# --- Cabeçalho e Bloco de Exportação --- #}
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="text-dark">
-            <i class="bi bi-bar-chart-fill me-2 text-primary"></i> Relatórios
-        </h2>
+    <div class="rel-header mb-4">
+  <div class="rel-title">
+    <h2 class="m-0 fw-bold">
+      <i class="bi bi-bar-chart-fill me-2 text-primary"></i> Relatórios
+    </h2>
+  </div>
 
-        {# --- Bloco de Exportação AGORA COM FORMS GET --- #}
-        <div class="d-flex gap-2">
-            
-            {# FORMULÁRIO DE EXPORTAÇÃO PDF (Substitui o Link <a>) #}
-            <form method="GET" action="{{ url_for('main.exportar_relatorio_pdf') }}" class="form-exportar p-0 m-0">
-                <input type="hidden" name="mes" value="{{ mes_selecionado }}">
-                <input type="hidden" name="ano" value="{{ ano_selecionado }}">
-                <input type="hidden" name="uvis_id" value="{{ uvis_id_selecionado }}">
-                <button type="submit" class="btn btn-danger">
-                    <i class="bi bi-file-earmark-pdf-fill"></i> Exportar PDF
-                </button>
-            </form>
+  <div class="rel-actions">
+    <form method="GET" action="{{ url_for('main.exportar_relatorio_pdf') }}" class="form-exportar p-0 m-0">
+      <input type="hidden" name="mes" value="{{ mes_selecionado }}">
+      <input type="hidden" name="ano" value="{{ ano_selecionado }}">
+      <input type="hidden" name="uvis_id" value="{{ uvis_id_selecionado }}">
+      <button type="submit" class="btn btn-danger bt-sm" title="Exportar PDF">
+        <i class="bi bi-file-earmark-pdf-fill"></i>
+        <span>Exportar PDF</span>
+      </button>
+    </form>
 
-            {# FORMULÁRIO DE EXPORTAÇÃO EXCEL (Substitui o Link <a>) #}
-            <form method="GET" action="{{ url_for('main.exportar_relatorio_excel') }}" class="form-exportar p-0 m-0">
-                <input type="hidden" name="mes" value="{{ mes_selecionado }}">
-                <input type="hidden" name="ano" value="{{ ano_selecionado }}">
-                <input type="hidden" name="uvis_id" value="{{ uvis_id_selecionado }}">
-                <button type="submit" class="btn btn-success">
-                    <i class="bi bi-file-earmark-excel-fill"></i> Exportar Excel
-                </button>
-            </form>
-            
+    <form method="GET" action="{{ url_for('main.exportar_relatorio_excel') }}" class="form-exportar p-0 m-0">
+      <input type="hidden" name="mes" value="{{ mes_selecionado }}">
+      <input type="hidden" name="ano" value="{{ ano_selecionado }}">
+      <input type="hidden" name="uvis_id" value="{{ uvis_id_selecionado }}">
+      <button type="submit" class="btn btn-success bt-sm" title="Exportar Excel">
+        <i class="bi bi-file-earmark-excel-fill"></i>
+        <span>Exportar Excel</span>
+      </button>
+    </form>
+  </div>
+</div>
+
+{# --- FILTROS EM "SANFONA" (Accordion) --- #}
+<div class="card shadow-sm rounded-4 mb-4 border-0">
+
+    <!-- HEADER -->
+    <div class="card-header border-0 p-3 d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse"
+         data-bs-target="#collapseFiltros"
+         aria-expanded="true"
+         style="cursor: pointer;">
+
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-funnel-fill text-primary"></i>
+            <span class="text-dark">Filtros de busca</span>
+
+            {# bolinha vermelha se houver filtros ativos #}
+            {% if mes_selecionado or ano_selecionado or uvis_id_selecionado %}
+                <span class="badge bg-danger rounded-circle p-1"
+                      style="width: 8px; height: 8px;"></span>
+            {% endif %}
         </div>
+
+        <i class="bi bi-chevron-down text-muted"></i>
     </div>
 
-    {# --- Bloco de Filtros Unificado (MANTIDO) --- #}
-    <form method="GET" class="card p-3 mb-4 shadow-sm rounded-4">
-        <div class="row g-2 align-items-end">
-            <div class="col-md-3">
-                <label class="small text-muted">Mês:</label>
-                <select name="mes" class="form-select form-select-sm">
-                    {% for num, nome in meses.items() %}
-                        {# Convertemos ambos para int para garantir que o 'selected' funcione #}
-                        <option value="{{ num }}" {% if num|int == mes_selecionado|int %}selected{% endif %}>
-                            {{ nome }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
+    <!-- CORPO (SANFONA) -->
+    <div class="collapse {% if request.args %}show{% endif %}" id="collapseFiltros">
 
-            <div class="col-md-3">
-                <label for="ano_select" class="small text-muted">Ano:</label>
-                <select name="ano" id="ano_select" class="form-select form-select-sm">
-                    {% for ano in anos_disponiveis %}
-                        <option value="{{ ano }}" {% if ano|int == ano_selecionado|int %}selected{% endif %}>{{ ano }}</option>
-                    {% endfor %}
-                </select>
-            </div>
 
-            <div class="col-md-3">
-                <label for="uvis_select" class="small text-muted">Unidade (UVIS):</label>
-                <select name="uvis_id" id="uvis_select" class="form-select form-select-sm">
-                    <option value="" {% if uvis_id_selecionado is none or uvis_id_selecionado == "" %}selected{% endif %}>Todas as Unidades</option>
-                    {% for id, nome in uvis_disponiveis %}
-                        <option value="{{ id }}" {% if id|int == uvis_id_selecionado|int %}selected{% endif %}>{{ nome }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+        <div class="card-body pt-0">
+            <form method="GET">
+                <div class="row g-2 align-items-end">
 
-            <div class="col-md-3 d-flex gap-2">
-                <button type="submit" class="btn btn-success btn-sm w-100"><i class="bi bi-funnel"></i> Filtrar</button>
+                    <div class="col-md-3">
+                        <label class="small text-muted">Mês:</label>
+                        <select name="mes" class="form-select form-select-sm">
+                            {% for num, nome in meses.items() %}
+                                <option value="{{ num }}"
+                                    {% if num|int == mes_selecionado|int %}selected{% endif %}>
+                                    {{ nome }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-                {% if uvis_id_selecionado %}
-                <a href="{{ url_for('main.relatorios') }}" class="btn btn-outline-secondary btn-sm w-100">
-                    <i class="bi bi-x-lg"></i> Limpar
-                </a>
-                {% endif %}
-            </div>
+                    <div class="col-md-3">
+                        <label class="small text-muted">Ano:</label>
+                        <select name="ano" class="form-select form-select-sm">
+                            {% for ano in anos_disponiveis %}
+                                <option value="{{ ano }}"
+                                    {% if ano|int == ano_selecionado|int %}selected{% endif %}>
+                                    {{ ano }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="small text-muted">Unidade (UVIS):</label>
+                        <select name="uvis_id" class="form-select form-select-sm">
+                            <option value="">Todas as Unidades</option>
+                            {% for id, nome in uvis_disponiveis %}
+                                <option value="{{ id }}"
+                                    {% if id|int == uvis_id_selecionado|int %}selected{% endif %}>
+                                    {{ nome }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-3 d-flex gap-2">
+                        <button class="btn btn-success btn-sm w-100" type="submit">
+                            <i class="bi bi-funnel"></i> Filtrar
+                        </button>
+
+                        {% if mes_selecionado or ano_selecionado or uvis_id_selecionado %}
+                            <a href="{{ url_for(request.endpoint) }}"
+                               class="btn btn-outline-secondary btn-sm w-100">
+                                <i class="bi bi-x-lg"></i> Limpar
+                            </a>
+                        {% endif %}
+                    </div>
+
+                </div>
+            </form>
         </div>
-    </form>
+    </div>
+</div>
+
+
 
 
     <h4 class="mb-4 text-primary">

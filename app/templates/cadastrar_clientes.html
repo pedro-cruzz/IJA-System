@@ -1,4 +1,7 @@
 {% extends "base.html" %} {% block content %}
+{% block extra_styles %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/buttons.css') }}">
+{% endblock %}
 <div class="container-fluid py-4" style="max-width: 1200px">
   {# --- Cabeçalho --- #}
   <div class="d-flex align-items-center mb-4">
@@ -282,11 +285,11 @@
         <div class="d-flex justify-content-end gap-2 mt-5">
           <a
             href="{{ url_for('main.listar_clientes') }}"
-            class="btn btn-outline-danger px-4"
+            class="btn btn-outline-danger btn-sm"
           >
             <i class="bi bi-x-lg me-1"></i> Cancelar
           </a>
-          <button type="submit" class="btn btn-primary px-5 shadow-sm fw-bold">
+          <button type="submit" class="btn btn-primary btn-sm">
             <a href="{{ url_for('main.listar_clientes') }}"></a>
             <i class="bi bi-check-lg me-1"></i> Salvar Cliente
           </button>

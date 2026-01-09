@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/buttons.css') }}" />
+{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid py-4" style="max-width: 1200px">
+  {# --- Cabeçalho --- #}
+  <div class="d-flex align-items-center mb-4">
+    <h2 class="text-dark m-0">
+      <i class="bi bi-person-badge-fill me-2 text-primary"></i> Cadastrar Piloto
+    </h2>
+  </div>
+
+  {# --- Mensagens de Feedback --- #}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm mb-4 rounded-3" role="alert">
+          <i class="bi bi-info-circle me-2"></i> {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  {# --- Card Principal --- #}
+  <div class="card info status-primary shadow-sm rounded-4 border-0">
+    <div class="card-body p-4">
+      <form method="post" action="{{ url_for('main.cadastrar_pilotos') }}" novalidate>
+
+        {# SEÇÃO 1: IDENTIFICAÇÃO #}
+        <div class="d-flex align-items-center mb-3">
+          <i class="bi bi-card-heading text-primary me-2 fs-5"></i>
+          <h5 class="m-0 text-primary fw-bold">Identificação</h5>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-8">
+            <label class="form-label fw-bold small text-muted">
+              <i class="bi bi-person me-1 text-primary"></i> Nome do Piloto *
+            </label>
+            <input
+              type="text"
+              class="form-control {% if errors.get('nome_piloto') %}is-invalid{% endif %}"
+              name="nome_piloto"
+              value="{{ form.get('nome_piloto','') }}"
+              placeholder="Ex: João Silva"
+              required
+            />
+            {% if errors.get('nome_piloto') %}
+              <div class="invalid-feedback">{{ errors.get('nome_piloto') }}</div>
+            {% endif %}
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label fw-bold small text-muted">
+              <i class="bi bi-geo-alt me-1 text-primary"></i> Região
+            </label>
+
+            {% set reg = (form.get('regiao','') or '')|upper %}
+            <select name="regiao" class="form-select {% if errors.get('regiao') %}is-invalid{% endif %}">
+              <option value="">Selecione...</option>
+              <option value="NORTE" {% if reg == 'NORTE' %}selected{% endif %}>NORTE</option>
+              <option value="SUL" {% if reg == 'SUL' %}selected{% endif %}>SUL</option>
+              <option value="LESTE" {% if reg == 'LESTE' %}selected{% endif %}>LESTE</option>
+              <option value="OESTE" {% if reg == 'OESTE' %}selected{% endif %}>OESTE</option>
+            </select>
+
+            {% if errors.get('regiao') %}
+              <div class="invalid-feedback">{{ errors.get('regiao') }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <hr class="text-muted opacity-25 my-4" />
+
+        {# SEÇÃO 2: CONTATO #}
+        <div class="d-flex align-items-center mb-3">
+          <i class="bi bi-telephone-fill text-primary me-2 fs-5"></i>
+          <h5 class="m-0 text-primary fw-bold">Contato</h5>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <label class="form-label fw-bold small text-muted">
+              <i class="bi bi-whatsapp me-1 text-primary"></i> Telefone
+            </label>
+            <input
+              type="text"
+              id="telefone"
+              name="telefone"
+              class="form-control {% if errors.get('telefone') %}is-invalid{% endif %}"
+              value="{{ form.get('telefone','') }}"
+              inputmode="numeric"
+              placeholder="(00) 00000-0000"
+            />
+            {% if errors.get('telefone') %}
+              <div class="invalid-feedback">{{ errors.get('telefone') }}</div>
+            {% endif %}
+            <div class="form-text small">
+              Somente números. O sistema formata automaticamente.
+            </div>
+          </div>
+        </div>
+<hr class="text-muted opacity-25 my-4" />
+
+<div class="d-flex align-items-center mb-3">
+  <i class="bi bi-key-fill text-primary me-2 fs-5"></i>
+  <h5 class="m-0 text-primary fw-bold">Acesso (Login)</h5>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <label class="form-label fw-bold small text-muted">
+      <i class="bi bi-person-lock me-1 text-primary"></i> Login do Piloto *
+    </label>
+    <input
+      type="text"
+      class="form-control {% if errors.get('login') %}is-invalid{% endif %}"
+      name="login"
+      value="{{ form.get('login','') }}"
+      placeholder="ex: joao.silva"
+      required
+    />
+    {% if errors.get('login') %}
+      <div class="invalid-feedback">{{ errors.get('login') }}</div>
+    {% endif %}
+  </div>
+
+  <div class="col-md-4">
+    <label class="form-label fw-bold small text-muted">
+      <i class="bi bi-shield-lock me-1 text-primary"></i> Senha *
+    </label>
+    <input
+      type="password"
+      class="form-control {% if errors.get('senha') %}is-invalid{% endif %}"
+      name="senha"
+      value="{{ form.get('senha','') }}"
+      placeholder="Crie uma senha"
+      required
+    />
+    {% if errors.get('senha') %}
+      <div class="invalid-feedback">{{ errors.get('senha') }}</div>
+    {% endif %}
+  </div>
+
+  <div class="col-md-4">
+    <label class="form-label fw-bold small text-muted">
+      <i class="bi bi-shield-check me-1 text-primary"></i> Confirmar senha *
+    </label>
+    <input
+      type="password"
+      class="form-control {% if errors.get('senha2') %}is-invalid{% endif %}"
+      name="senha2"
+      value="{{ form.get('senha2','') }}"
+      placeholder="Repita a senha"
+      required
+    />
+    {% if errors.get('senha2') %}
+      <div class="invalid-feedback">{{ errors.get('senha2') }}</div>
+    {% endif %}
+  </div>
+</div>
+
+        <small class="text-muted d-block mt-4">
+          Campos com <span class="text-danger">*</span> são de preenchimento obrigatório.
+        </small>
+
+        {# BOTÕES #}
+        <div class="d-flex justify-content-end gap-2 mt-5">
+          <a href="{{ url_for('main.listar_pilotos') }}" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-x-lg me-1"></i> Cancelar
+          </a>
+
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-check-lg me-1"></i> Salvar Piloto
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function onlyDigits(v) {
+    return (v || "").replace(/\D/g, "");
+  }
+
+  function maskTelefone(value) {
+    const d = onlyDigits(value).slice(0, 11);
+    if (d.length <= 2) return d;
+    if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+    if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+    return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  }
+
+  const telInput = document.getElementById("telefone");
+  if (telInput) {
+    telInput.addEventListener("input", (e) => {
+      e.target.value = maskTelefone(e.target.value);
+    });
+  }
+</script>
+{% endblock %}
