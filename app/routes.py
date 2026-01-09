@@ -96,6 +96,17 @@ def get_upload_folder():
         os.makedirs(folder, exist_ok=True)
     return os.path.abspath(folder)
 
+import unicodedata
+
+def normalize_string(value):
+    if value:
+        return ''.join(
+            c for c in unicodedata.normalize('NFD', value)
+            if unicodedata.category(c) != 'Mn'
+        ).lower()
+    return value
+
+
 def allowed_file(filename: str) -> bool:
     """Verifica se a extensão do arquivo é permitida."""
     ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "doc", "docx", "xls", "xlsx"}
@@ -143,14 +154,13 @@ def roles_required(*roles):
 @bp.route('/')
 @login_required
 def dashboard():
-
     if current_user.tipo_usuario == 'piloto':
         return redirect(url_for('main.piloto_os'))
 
     if current_user.tipo_usuario in ['admin', 'operario', 'visualizar']:
         return redirect(url_for('main.admin_dashboard'))
 
-    # ✅ UVIS: só as solicitações dela + carrega piloto pra exibir
+    # ✅ UVIS: só as solicitações dela + carrega piloto para exibir
     query = (
         Solicitacao.query
         .options(
@@ -160,10 +170,23 @@ def dashboard():
         .filter(Solicitacao.usuario_id == current_user.id)
     )
 
+    # Filtragem por status (original)
     filtro_status = request.args.get('status')
     if filtro_status:
         query = query.filter(Solicitacao.status == filtro_status)
 
+    # Filtro por tipo de visita
+    filtro_tipo_visita = request.args.get('tipo_visita')
+    if filtro_tipo_visita:
+        query = query.filter(Solicitacao.tipo_visita == filtro_tipo_visita)
+
+    # Filtro por foco da ação
+    filtro_foco = request.args.get('foco')
+    if filtro_foco:
+        query = query.filter(Solicitacao.foco == filtro_foco)  # Aqui, o valor de filtro_foco já é uma string
+
+
+    # Paginação
     page = request.args.get("page", 1, type=int)
     paginacao = query.order_by(Solicitacao.data_criacao.desc())\
         .paginate(page=page, per_page=6, error_out=False)
@@ -173,6 +196,7 @@ def dashboard():
         solicitacoes=paginacao.items,
         paginacao=paginacao,
     )
+
 
 # --- PAINEL DE GESTÃO (Visualização para todos) ---
 from flask_login import login_required, current_user
@@ -534,7 +558,7 @@ def novo():
                 uf=request.form.get('uf'),
                 complemento=request.form.get('complemento'),
 
-                foco=request.form.get('foco'),
+                foco=request.form.get('foco')
                 tipo_visita=request.form.get('tipo_visita'),
                 altura_voo=request.form.get('altura_voo'),
                 apoio_cet=apoio_cet_bool,
